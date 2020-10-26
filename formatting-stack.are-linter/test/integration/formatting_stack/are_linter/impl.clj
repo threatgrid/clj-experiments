@@ -11,6 +11,17 @@
          (sut/aliased-are-names-of "test/integration/formatting_stack/are_linter/cljs_sample.cljs"))
       "Returns `are` symbols qualified by aliases that refer to `clojure.test`/`cljs.test`"))
 
+(deftest ns-aliases-crossplatform
+  (are [filename ns-obj expected] (testing filename
+                                    (let [result (sut/ns-aliases-crossplatform filename ns-obj)]
+                                      (is (= expected
+                                             result))
+                                      true))
+    "test/integration/formatting_stack/are_linter/cljs_sample.cljs" nil                               {'foo  (find-ns 'cljs.test)
+                                                                                                       'quux (find-ns 'bar)}
+    "test/integration/formatting_stack/are_linter/impl.clj"         (-> ::_ namespace symbol find-ns) {'string (find-ns 'clojure.string)
+                                                                                                       'sut    (find-ns 'formatting-stack.are-linter.impl)}))
+
 (deftest find-are-forms
   (testing "Finds `are` forms, honoring the `filename`'s `#'ns-aliases`, and including line/column metadata"
     (let [filename "test/integration/formatting_stack/are_linter/sample.clj"

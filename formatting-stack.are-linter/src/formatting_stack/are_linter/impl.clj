@@ -64,21 +64,35 @@
         line   (assoc :line line)
         column (assoc :column column)))))
 
+(defn filename->names-and-aliases [filename]
+  (->> filename
+       formatting-stack.util/read-ns-decl
+       formatting-stack.util/require-from-ns-decl
+       (rest)
+       (map formatting-stack.linters.ns-aliases/name-and-alias)))
+
 (speced/defn ^{::speced/spec (spec/coll-of (spec/and qualified-symbol?
                                                      (rcomp namespace (complement #{"clojure.test"
                                                                                     "cljs.test"}))
                                                      (rcomp name #{"are"})))}
   aliased-are-names-of [filename]
   (->> filename
-       formatting-stack.util/read-ns-decl
-       formatting-stack.util/require-from-ns-decl
-       (rest)
-       (map formatting-stack.linters.ns-aliases/name-and-alias)
+       filename->names-and-aliases
        (keep (speced/fn [[^simple-symbol? ns-name, ^simple-symbol? ns-alias]]
                (when (and (#{'clojure.test 'cljs.test} ns-name)
                           alias)
                  (symbol (str ns-alias)
                          "are"))))))
+
+(speced/defn ns-aliases-crossplatform [^string? filename
+                                       ^::speced/nilable ^Namespace ns-obj]
+  (if ns-obj
+    (ns-aliases ns-obj)
+    (->> filename
+         filename->names-and-aliases
+         (map (speced/fn [[^simple-symbol? ns-name, ^simple-symbol? ns-alias]]
+                [ns-alias (create-ns ns-name)]))
+         (into {}))))
 
 (speced/defn ^{::speced/spec (spec/coll-of (spec/and list?
                                                      (rcomp first name #{"are"})))}
@@ -99,7 +113,12 @@
         are-forms (atom [])
         reader (-> filename io/reader push-back-reader indexing-push-back-reader)]
     (loop []
-      (speced/let [x (tools.reader/read reader false ::eof)
+      (speced/let [x (binding [tools.reader/*alias-map* (ns-aliases-crossplatform filename ns-obj)]
+                       (tools.reader/read {:eofthrow  false
+                                           :eof       ::eof
+                                           :read-cond :allow
+                                           :features  #{:clj}}
+                                          reader))
                    ^set? known-are-names are-names]
         (when (list? x)
           (let [result (atom false)]
