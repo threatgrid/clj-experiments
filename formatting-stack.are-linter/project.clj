@@ -1,7 +1,11 @@
 (defproject threatgrid/formatting-stack.are-linter "unreleased"
   ;; Please keep the dependencies sorted a-z.
   :dependencies [[com.nedap.staffing-solutions/speced.def "2.0.0"]
-                 [org.clojure/clojure "1.10.1"]]
+                 [com.nedap.staffing-solutions/utils.modular "2.1.1"]
+                 [com.stuartsierra/component "1.0.0"]
+                 [formatting-stack "4.2.1"]
+                 [org.clojure/clojure "1.10.1"]
+                 [org.clojure/tools.reader "1.3.3"]]
 
   :exclusions [org.clojure/clojurescript]
 
@@ -39,10 +43,8 @@
                                          [cloverage "1.2.0" #_"same version as lein-cloverage"]
                                          [com.clojure-goes-fast/clj-java-decompiler "0.3.0"]
                                          [com.nedap.staffing-solutions/utils.spec.predicates "1.1.0"]
-                                         [com.stuartsierra/component "1.0.0"]
                                          [com.taoensso/timbre "4.10.0"]
                                          [criterium "0.4.5"]
-                                         [formatting-stack "4.2.1"]
                                          [lambdaisland/deep-diff "0.0-47"]
                                          [medley "1.3.0"]
                                          [org.clojure/core.async "1.0.567"]
@@ -73,9 +75,6 @@
              :test       {:dependencies [[com.nedap.staffing-solutions/utils.test "1.6.2"]]
                           :jvm-opts     ["-Dclojure.core.async.go-checking=true"
                                          "-Duser.language=en-US"]}
-
-             :ncrw       {:global-vars  {*assert* true} ;; `ci.release-workflow` relies on runtime assertions
-                          :dependencies [[com.nedap.staffing-solutions/ci.release-workflow "1.11.0"]]}
 
              :ci         {:pedantic? :abort
                           :jvm-opts  ["-Dclojure.main.report=stderr"]}})

@@ -1,10 +1,33 @@
 # formatting-stack.are-linter
 
-A [formatting-stack](https://github.com/nedap/formatting-stack/) linter for `clojure.test/are` forms.
+A [formatting-stack](https://github.com/nedap/formatting-stack) linter for `clojure.test/are` forms.    
 
-## Synopsis
+It currently lints just one thing: that any given templated form that is an _invocation_, appears just once in `are`'s `expr` argument.
 
-<!-- (Show off its main functions so the reader can get a basic idea) -->
+That way we can be sure that side-effects aren't repeated, which can lead to confusing reports or brittle tests.
+
+## Rationale
+
+This is an example of an `are` form that templates an invocation more than once:
+
+```clj
+(deftest foo-test
+  (are [x] (testing x
+             (is (forbidden? x))
+             (is (not (authorized? x))))
+    nil
+    "id-123"
+    (str (java.util.UUID/randomUUID))))
+```
+
+...in the snippet above, the `(str (java.util.UUID/randomUUID))` form will be invoked 3 times. That's not what one would expect:
+
+* the `testing` form will report one generated value, while the `is` forms will exercise _different_ generated values
+  * i.e. reports would be spurious.
+* the `forbidden?` and `authorized?` assertions exercise _different_ values, which creates a logically inconsistent test
+  * this can easily lead to false positives or negatives.  
+
+These gotchas justify the existence of `formatting-stack.are-linter`, so that one can use vanilla `clojure.test/are` (as opposed to a custom replacement) with full confidence.
 
 ## Installation
 
@@ -12,13 +35,11 @@ A [formatting-stack](https://github.com/nedap/formatting-stack/) linter for `clo
 [threatgrid/formatting-stack.are-linter "unreleased"]
 ```
 
-## ns organisation
+## Usage
 
-<!-- (how is the project organised? Which are its public parts?) -->
+This is a standard [formatting-stack](https://github.com/nedap/formatting-stack) linter so it follows its typical patterns.
 
-## Documentation
-
-Please browse the public namespaces, which are documented, speced and tested.
+You should be able to add `(formatting-stack.are-linter.api/new)` to your 'stack' of linters.
 
 ## Development
 
