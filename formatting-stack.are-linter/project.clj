@@ -1,4 +1,4 @@
-(defproject threatgrid/formatting-stack.are-linter "0.1.0-alpha2"
+(defproject threatgrid/formatting-stack.are-linter "0.1.0-alpha3"
   ;; Please keep the dependencies sorted a-z.
   :dependencies [[com.nedap.staffing-solutions/speced.def "2.0.0"]
                  [com.nedap.staffing-solutions/utils.modular "2.1.1"]
