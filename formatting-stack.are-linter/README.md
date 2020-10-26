@@ -41,6 +41,8 @@ This is a standard [formatting-stack](https://github.com/nedap/formatting-stack)
 
 You should be able to add `(formatting-stack.are-linter.api/new)` to your 'stack' of linters.
 
+This linter is Clojure/Script compatible. The ns-form parsing (necessary for processing e.g. `(foo/are` aliased forms) is particularly precise in JVM clojure. cljs falls back to tools.reader heuristics.
+
 ## Development
 
 The default namespace is `dev`. Under it, `(refresh)` is available, which should give you a basic "Reloaded workflow".
