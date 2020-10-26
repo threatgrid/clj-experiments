@@ -16,6 +16,16 @@
 (spec/def ::argv (spec/and (spec/coll-of any? :kind vector? :min-count 1)
                            (partial apply distinct?)))
 
+(defn is-or-contains-list? [x]
+  (and (coll? x)
+       (let [r (atom false)]
+         (->> x
+              (walk/postwalk (fn [x]
+                               (when (list? x)
+                                 (reset! r true))
+                               x)))
+         @r)))
+
 (speced/defn lint [filename [_are
                              ^::argv argv
                              ^some? expr
@@ -32,7 +42,7 @@
                                   counts (atom {})]
                               (->> expr
                                    (walk/postwalk (fn [x]
-                                                    (when (list? (get m x))
+                                                    (when (is-or-contains-list? (get m x))
                                                       (swap! counts update x (fnil inc 0)))
                                                     x)))
                               (when (->> @counts

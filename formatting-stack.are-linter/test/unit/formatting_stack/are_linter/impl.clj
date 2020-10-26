@@ -1,7 +1,22 @@
 (ns unit.formatting-stack.are-linter.impl
   (:require
-   [clojure.test :refer [are deftest is]]
+   [clojure.test :refer [are deftest is testing]]
    [formatting-stack.are-linter.impl :as sut]))
+
+(deftest is-or-contains-list?
+  (are [input expected] (testing input
+                          (is (= expected
+                                 (sut/is-or-contains-list? input)))
+                          true)
+    nil    false
+    2      false
+    []     false
+    [1]    false
+    ['()]  true
+    ['(1)] true
+    '()    true
+    '(1)   true
+    '[(1)] true))
 
 (deftest lint
   (let [good '(are [x y] (do
