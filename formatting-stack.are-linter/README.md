@@ -32,7 +32,7 @@ These gotchas justify the existence of `formatting-stack.are-linter`, so that on
 ## Installation
 
 ```clojure
-[threatgrid/formatting-stack.are-linter "unreleased"]
+[threatgrid/formatting-stack.are-linter "0.1.0-alpha1"]
 ```
 
 ## Usage
