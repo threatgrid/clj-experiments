@@ -20,10 +20,12 @@
   (and (coll? x)
        (let [r (atom false)]
          (->> x
-              (walk/postwalk (fn [x]
-                               (when (list? x)
-                                 (reset! r true))
-                               x)))
+              (walk/prewalk (fn [x]
+                              (when-not (and (list? x) ;; short-circuit traversing on quoted forms (which aren't invocations)
+                                             (-> x first #{'quote}))
+                                (when (list? x)
+                                  (reset! r true))
+                                x))))
          @r)))
 
 (speced/defn lint [filename [_are

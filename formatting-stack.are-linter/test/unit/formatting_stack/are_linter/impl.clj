@@ -8,15 +8,22 @@
                           (is (= expected
                                  (sut/is-or-contains-list? input)))
                           true)
-    nil    false
-    2      false
-    []     false
-    [1]    false
-    ['()]  true
-    ['(1)] true
-    '()    true
-    '(1)   true
-    '[(1)] true))
+    nil                                false
+    2                                  false
+    '2                                 false
+    []                                 false
+    [1]                                false
+    ['()]                              true
+    ['(1)]                             true
+    '()                                true
+    '(1)                               true
+    '[(1)]                             true
+    ''(1)                              false
+    '(some-call ''(1))                 true
+    [[[['(some-call)]]]]               true
+    [[[['(some-call ''(some-call))]]]] true
+    [[[[''(some-call)]]]]              false
+    [[[[''(some-call '(some-call))]]]] false))
 
 (deftest lint
   (binding [*ns* (-> ::_ namespace symbol find-ns)]
@@ -45,6 +52,6 @@
                    :source   :formatting-stack.are-linter.api/id,
                    :level    :warning,
                    :column   17,
-                   :line     31,
+                   :line     38,
                    :msg
                    "The following row invokes a function/macro more than once within the test body: (a) 1\nThe following row invokes a function/macro more than once within the test body: (b) 2"}))))
