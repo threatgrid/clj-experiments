@@ -338,12 +338,11 @@
         (nth 2))))
 
 (def parallelism-factor
-  "A reasonable factor for parallel Maven resolution.
-
-  Note that under lein-monolith parallel execution, each project would spawn 4 threads.
-  That is reasonable, while e.g. a value of `16` could result in hundreds of threads being spawned,
-  which seems detrimental for both us and the Maven servers."
-  4)
+  "A reasonable factor for parallel Maven resolution, which tries to maximise efficiency
+  while keeping thread count low which seems detrimental for both us and the Maven servers."
+  (if (find-ns 'lein-monolith.task.each)
+    1
+    4))
 
 (defn add [{:keys                                        [repositories managed-dependencies]
             {:keys [classifiers]
