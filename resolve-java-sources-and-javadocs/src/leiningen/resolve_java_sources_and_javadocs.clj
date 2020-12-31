@@ -6,6 +6,7 @@
   (:import
    (clojure.lang IFn)
    (java.io File)
+   (java.net URI InetAddress UnknownHostException)
    (java.nio ByteBuffer)
    (java.nio.channels FileChannel FileLock)
    (java.nio.file Paths StandardOpenOption)))
@@ -353,8 +354,15 @@
 
   (let [classifiers (set classifiers)
         repositories (->> repositories
-                          (remove (fn [x]
-                                    (-> x pr-str (.contains "password"))))
+                          (remove (fn [[_ {:keys [url] :as x}]]
+                                    (or (->> x keys (some #{:password}))
+                                        ;; Some domains may be behind under a VPN we are disconnected from:
+                                        (try
+                                          (when-let [{:keys [host]} (some-> url URI. bean)]
+                                            (InetAddress/getByName host)
+                                            false)
+                                          (catch UnknownHostException _
+                                            true)))))
                           (into {}))
         initial-cache-value (-> (read-file! cache-filename) safe-read-string deserialize)
         cache-atom (atom initial-cache-value)]
