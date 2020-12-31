@@ -22,6 +22,16 @@
       (catch Exception e
         (println x)))))
 
+(def debug-lock (Object.))
+
+(defn debug [x]
+  (locking debug-lock
+    (try
+      (require 'leiningen.core.main)
+      (-> 'leiningen.core.main/debug ^IFn resolve (.invoke x))
+      (catch Exception e
+        (println x)))))
+
 (def warn-lock (Object.))
 
 (defn warn [x]
@@ -219,6 +229,7 @@
   (let [v (or (get @cache-atom x)
               (get @cache-atom (maybe-normalize x))
               (try
+                (debug (str ::resolving " " (pr-str x)))
                 (let [v (cemerick.pomegranate.aether/resolve-dependencies :coordinates x
                                                                           :repositories repositories)
                       [x] x]
@@ -235,7 +246,9 @@
                     []
                     (do
                       (-> e .printStackTrace)
-                      nil)))))]
+                      nil)))
+                (finally
+                  (debug (str ::resolved " " (pr-str x))))))]
     (when v
       (swap! cache-atom assoc x v))
     v))
