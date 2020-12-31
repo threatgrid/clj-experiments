@@ -29,8 +29,8 @@
                                   (is (= expected v))
                                   (is (= expected (sut/read-file! filename))))
                                 true)
-          (swap! state assoc [[4]] {[5 6] nil}) "[[[[4]] [[[5 6] nil]]]]"
-          (swap! state assoc [[1]] {[2 3] nil}) "[[[[1]] [[[2 3] nil]]] [[[4]] [[[5 6] nil]]]]")
+          (swap! state assoc [[4]] {[5 6] nil}) "[[[[4]] [[[5 6] nil]]]]\n"
+          (swap! state assoc [[1]] {[2 3] nil}) "[[[[1]] [[[2 3] nil]]] [[[4]] [[[5 6] nil]]]]\n")
         (finally
           (-> file .delete))))))
 

@@ -1,6 +1,7 @@
 (ns leiningen.resolve-java-sources-and-javadocs
   (:require
    [cemerick.pomegranate.aether]
+   [fipp.clojure]
    [clojure.string :as string]
    [clojure.walk :as walk])
   (:import
@@ -213,6 +214,10 @@
     {}
     (read-string x)))
 
+(defn ppr-str [x]
+  (with-out-str
+    (fipp.clojure/pprint x)))
+
 (defn make-merge-fn [cache-atom]
   {:pre [@cache-atom]}
   (fn [^String prev-val]
@@ -223,7 +228,7 @@
         deserialize
         (merge @cache-atom)
         serialize
-        pr-str)))
+        ppr-str)))
 
 (defn resolve! [cache-atom repositories classifiers x]
   (let [v (or (get @cache-atom x)
