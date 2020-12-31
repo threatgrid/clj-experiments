@@ -1,7 +1,8 @@
 (ns leiningen.resolve-java-sources-and-javadocs
   (:require
    [cemerick.pomegranate.aether]
-   [clojure.string :as string])
+   [clojure.string :as string]
+   [clojure.walk :as walk])
   (:import
    (clojure.lang IFn)
    (java.io File)
@@ -94,6 +95,32 @@
           (Thread/sleep 50)
           (write-file! filename (read-file! filename) merge-fn))))))
 
+(defn index [coll item]
+  {:pre  [(vector? coll)]
+   :post [(or (pos? %) ;; note: there's no nat-int? in old versions of Lein
+              (zero? %))]}
+  (->> coll
+       (map-indexed (fn [i x]
+                      (when (= x item)
+                        i)))
+       (filter some?)
+       first))
+
+(defn normalize-exclusions [exclusions]
+  {:pre [(sequential? exclusions)]}
+  (->> exclusions
+       (mapv (fn [x]
+               (cond-> x
+                 (not (vector? x)) vector)))))
+
+(defn maybe-normalize [x]
+  (->> x
+       (walk/postwalk (fn [item]
+                        (cond-> item
+                          (and (vector? item)
+                               (some #{:exclusions} item))
+                          (update (inc (index item :exclusions)) normalize-exclusions))))))
+
 (defn safe-sort
   "Guards against errors when comparing objects of different classes."
   [coll]
@@ -109,7 +136,9 @@
                      (inner-compare [x] y)
 
                      true
-                     (compare x y))
+                     (->> [x y]
+                          (map maybe-normalize)
+                          (apply compare)))
                    (catch Exception e
                      (warn (pr-str [::could-not-sort x y]))
                      (when (System/getProperty "leiningen.resolve-java-sources-and-javadocs.throw")
@@ -187,6 +216,7 @@
 
 (defn resolve! [cache-atom repositories classifiers x]
   (let [v (or (get @cache-atom x)
+              (get @cache-atom (maybe-normalize x))
               (try
                 (let [v (cemerick.pomegranate.aether/resolve-dependencies :coordinates x
                                                                           :repositories repositories)
@@ -349,6 +379,15 @@
                                    (mapv (fn [x]
                                            (conj x :exclusions '[[*]]))))]
                 (when-not (= initial-cache-value @cache-atom)
+                  ;; NOTE: there's a negligible race condition here
+                  ;; (as there's a window between read time and write time in which no lock is held).
+                  ;; the likelihood for it is very low (`lein deps` takes seconds if not minutes),
+                  ;; while the window for a race is of about 1ms.
+                  ;; At most one risks dropping some additions (which can always be re-cached later),
+                  ;; but no actual issues/errors can arise.
+
+                  ;; A possible fix would be to make `write-file!` also use StandardOpenOption/READ
+                  ;; (which was problematic on its own as it resulted in files being appended to, instead of overwritten)
                   (write-file! cache-filename
                                (read-file! cache-filename)
                                (make-merge-fn cache-atom)))

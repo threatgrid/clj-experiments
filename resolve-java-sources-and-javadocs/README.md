@@ -27,7 +27,7 @@ A great real-world lib that would be enhanced by this plugin is Orchard's [sourc
 Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide profile](https://github.com/technomancy/leiningen/blob/0f456829a8b21335aa86390f3ee3d0dcc68410d6/doc/PROFILES.md#declaring-profiles)):
 
 ```clj
-:plugins [[threatgrid/resolve-java-sources-and-javadocs "0.1.10"]]
+:plugins [[threatgrid/resolve-java-sources-and-javadocs "0.1.11"]]
 :middleware [leiningen.resolve-java-sources-and-javadocs/add]
 ;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
 :resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}
