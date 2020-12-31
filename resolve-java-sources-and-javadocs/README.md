@@ -27,19 +27,18 @@ A great real-world lib that would be enhanced by this plugin is Orchard's [sourc
 Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide profile](https://github.com/technomancy/leiningen/blob/0f456829a8b21335aa86390f3ee3d0dcc68410d6/doc/PROFILES.md#declaring-profiles)):
 
 ```clj
-:plugins [[threatgrid/resolve-java-sources-and-javadocs "0.1.12"]]
-:middleware [leiningen.resolve-java-sources-and-javadocs/add]
-;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
-:resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}
+;; Installing this plugin under the :repl profile is most recommended for best performance,
+;; especially if you work on a monorepo with a complex build process.  
+:repl {:middleware [leiningen.resolve-java-sources-and-javadocs/add]
+       :plugins [[threatgrid/resolve-java-sources-and-javadocs "0.1.12"]]
+       ;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
+       :resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}}
+
 ```
 
 > If adding this middleware on a per-project basis, make sure it's not turned on by default, simply because other people might not appreciate a slower (first) dependency resolution for a functionality that they might not use. [Profiles](https://github.com/technomancy/leiningen/blob/master/doc/PROFILES.md) help.  
 
-After that, `lein deps` and any other Lein task that resolves dependencies will fetch the same dependencies, but additionally with `"sources"` and `"javadoc"` Maven qualifiers, if they exist (normally these only exist for Java dependencies, not Clojure ones). 
-
-## Task usage
-
-While `:middleware` usage is the primary API, you can also run `lein resolve-java-sources-and-javadocs`. This will only download `.jar`s to `~/.m2` as a one-off task, without altering your classpath later.
+After that, `lein repl` and similar commands will download each artifact of your dependency tree with `"sources"` and `"javadoc"` Maven qualifiers, if such an artifact exists (normally these only exist for Java dependencies, not Clojure ones), and place it in the classpath for your REPL process. 
 
 ## Notes on caching
 
@@ -59,7 +58,7 @@ The `~/.lein-source-and-javadocs-cache` file has a stable format. You can versio
 
 ## Options
 
-By default, both sources and javadocs will be fetched. By specifying only `sources` to be fetched, one gets a 2x performance improvement (because 0.5x items will be attempted to be resolved):
+By default, both sources and javadocs will be fetched. By specifying only `sources` to be fetched, one gets a 2x performance improvement (because 0.5x as many items will be attempted to be resolved):
 
 ```clj
 :resolve-java-sources-and-javadocs {:classifiers #{"sources"}}
