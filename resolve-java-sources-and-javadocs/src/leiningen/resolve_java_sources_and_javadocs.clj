@@ -149,6 +149,16 @@
                     (info (str ::found " " (pr-str x))))
                   ;; ensure the cache gets set to something:
                   (doto v assert))
+                (catch AbstractMethodError e
+                  ;; Catches:
+
+                  ;; "Tried to use insecure HTTP repository without TLS:
+                  ;; This is almost certainly a mistake; for details see
+                  ;; https://github.com/technomancy/leiningen/blob/master/doc/FAQ.md"
+
+                  ;; (apparently it's a bit hard to add some kind of conditional for only catching *that* AbstractMethodError,
+                  ;; but AbstractMethodErrors are rare enough that we can simply assume they have a single possible cause)
+                  [])
                 (catch Exception e
                   (if (#{(Class/forName "org.eclipse.aether.resolution.DependencyResolutionException")
                          (Class/forName "org.eclipse.aether.transfer.ArtifactNotFoundException")
