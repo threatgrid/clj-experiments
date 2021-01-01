@@ -1,47 +1,16 @@
 (ns leiningen.resolve-java-sources-and-javadocs
   (:require
    [cemerick.pomegranate.aether]
-   [fipp.clojure]
    [clojure.string :as string]
-   [clojure.walk :as walk])
+   [fipp.clojure]
+   [leiningen.resolve-java-sources-and-javadocs.collections :refer [divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
+   [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]])
   (:import
-   (clojure.lang IFn)
    (java.io File)
-   (java.net URI InetAddress UnknownHostException)
+   (java.net InetAddress UnknownHostException URI)
    (java.nio ByteBuffer)
    (java.nio.channels FileChannel FileLock)
    (java.nio.file Paths StandardOpenOption)))
-
-(def info-lock (Object.))
-
-;; These logging helpers ease developing the plugin itself (since leiningen.core cannot be required in rich repls)
-(defn info [x]
-  (locking info-lock
-    (try
-      (require 'leiningen.core.main)
-      (-> 'leiningen.core.main/info ^IFn resolve (.invoke x))
-      (catch Exception e
-        (println x)))))
-
-(def debug-lock (Object.))
-
-(defn debug [x]
-  (locking debug-lock
-    (try
-      (require 'leiningen.core.main)
-      (-> 'leiningen.core.main/debug ^IFn resolve (.invoke x))
-      (catch Exception e
-        (println x)))))
-
-(def warn-lock (Object.))
-
-(defn warn [x]
-  (locking warn-lock
-    (try
-      (require 'leiningen.core.main)
-      (-> 'leiningen.core.main/warn ^IFn resolve (.invoke x))
-      (catch Exception e
-        (println x)))))
 
 (def ^String cache-filename
   (-> "user.home"
@@ -106,69 +75,6 @@
         (do
           (Thread/sleep 50)
           (write-file! filename (read-file! filename) merge-fn))))))
-
-(defn index [coll item]
-  {:pre  [(vector? coll)]
-   :post [(or (pos? %) ;; note: there's no nat-int? in old versions of Lein
-              (zero? %))]}
-  (->> coll
-       (map-indexed (fn [i x]
-                      (when (= x item)
-                        i)))
-       (filter some?)
-       first))
-
-(defn normalize-exclusions [exclusions]
-  {:pre [(sequential? exclusions)]}
-  (->> exclusions
-       (mapv (fn [x]
-               (cond-> x
-                 (not (vector? x)) vector)))))
-
-(defn maybe-normalize [x]
-  (->> x
-       (walk/postwalk (fn [item]
-                        (cond-> item
-                          (and (vector? item)
-                               (some #{:exclusions} item))
-                          (update (inc (index item :exclusions)) normalize-exclusions))))))
-
-(defn safe-sort
-  "Guards against errors when comparing objects of different classes."
-  [coll]
-  (try
-    (->> coll
-         (sort (fn inner-compare [x y]
-                 (try
-                   (cond
-                     (and (vector? x) (not (coll? y)))
-                     (inner-compare x [y])
-
-                     (and (vector? y) (not (coll? x)))
-                     (inner-compare [x] y)
-
-                     true
-                     (->> [x y]
-                          (map maybe-normalize)
-                          (apply compare)))
-                   (catch Exception e
-                     (warn (pr-str [::could-not-sort x y]))
-                     (when (System/getProperty "leiningen.resolve-java-sources-and-javadocs.throw")
-                       (throw e))
-                     0)))))
-    (catch Exception e
-      (warn (pr-str [::could-not-sort coll]))
-      (when (System/getProperty "leiningen.resolve-java-sources-and-javadocs.throw")
-        (throw e))
-      coll)))
-
-(defn ensure-no-lists [x]
-  {:pre [(vector? x)]}
-  (->> x (mapv (fn [y]
-                 (let [v (cond-> y
-                           (sequential? y) vec)]
-                   (cond-> v
-                     (vector? v) ensure-no-lists))))))
 
 (defn serialize
   "Turns any contained coll into a vector, sorting it.
@@ -258,11 +164,6 @@
       (swap! cache-atom assoc x v))
     v))
 
-(defn flatten-deps [xs]
-  (->> xs
-       (mapcat (fn [[k v]]
-                 (apply list k v)))))
-
 (defn derivatives [classifiers managed-dependencies memoized-resolve! [dep version & args :as original]]
   (let [version (or version
                     (->> managed-dependencies
@@ -327,40 +228,22 @@
              (sort-by second)
              (last)))))
 
-(defn divide-by
-  "Divides `coll` in `n` parts. The parts can have disparate sizes if the division isn't exact."
-  {:author  "https://github.com/nedap/utils.collections"
-   :license "Eclipse Public License 2.0"}
-  [n
-   coll]
-  (let [the-count (count coll)
-        seed [(-> the-count double (/ n) Math/floor)
-              (rem the-count n)
-              []
-              coll]
-        recipe (iterate (fn [[quotient remainder output input]]
-                          (let [chunk-size (+ quotient (if (pos? remainder)
-                                                         1
-                                                         0))
-                                addition (take chunk-size input)
-                                result (cond-> output
-                                         (seq addition) (conj addition))]
-                            [quotient
-                             (dec remainder)
-                             result
-                             (drop chunk-size input)]))
-                        seed)
-        index (inc n)]
-    (-> recipe
-        (nth index)
-        (nth 2))))
-
 (def parallelism-factor
   "A reasonable factor for parallel Maven resolution, which tries to maximise efficiency
   while keeping thread count low which seems detrimental for both us and the Maven servers."
   (if (find-ns 'lein-monolith.task.each)
     1
     4))
+
+(defn private-repository? [[_ {:keys [url] :as x}]]
+  (or (->> x keys (some #{:password}))
+      ;; Some domains may be behind under a VPN we are disconnected from:
+      (try
+        (when-let [{:keys [host]} (some-> url URI. bean)]
+          (InetAddress/getByName host)
+          false)
+        (catch UnknownHostException _
+          true))))
 
 (defn add [{:keys                                        [repositories managed-dependencies]
             {:keys [classifiers]
@@ -370,17 +253,9 @@
   (-> cache-filename java.io.File. .createNewFile)
 
   (let [classifiers (set classifiers)
-        repositories (->> repositories
-                          (remove (fn [[_ {:keys [url] :as x}]]
-                                    (or (->> x keys (some #{:password}))
-                                        ;; Some domains may be behind under a VPN we are disconnected from:
-                                        (try
-                                          (when-let [{:keys [host]} (some-> url URI. bean)]
-                                            (InetAddress/getByName host)
-                                            false)
-                                          (catch UnknownHostException _
-                                            true)))))
-                          (into {}))
+        repositories  (into {}
+                            (remove private-repository?)
+                            repositories)
         initial-cache-value (-> (read-file! cache-filename) safe-read-string deserialize)
         cache-atom (atom initial-cache-value)]
     (update project
@@ -391,7 +266,10 @@
                                    (divide-by parallelism-factor)
                                    (pmap (fn [work]
                                            (->> work
-                                                (mapcat (partial derivatives classifiers managed-dependencies memoized-resolve!)))))
+                                                (mapcat (partial derivatives
+                                                                 classifiers
+                                                                 managed-dependencies
+                                                                 memoized-resolve!)))))
                                    (apply concat)
                                    (distinct)
                                    (filter (fn [[_ _ _ x]]
@@ -406,13 +284,13 @@
                 (when-not (= initial-cache-value @cache-atom)
                   ;; NOTE: there's a negligible race condition here
                   ;; (as there's a window between read time and write time in which no lock is held).
-                  ;; the likelihood for it is very low (`lein deps` takes seconds if not minutes),
-                  ;; while the window for a race is of about 1ms.
+                  ;; the likelihood for it is very low (`lein deps` takes seconds if not minutes,
+                  ;; while the window for a race is of about 1ms).
                   ;; At most one risks dropping some additions (which can always be re-cached later),
                   ;; but no actual issues/errors can arise.
 
                   ;; A possible fix would be to make `write-file!` also use StandardOpenOption/READ
-                  ;; (which was problematic on its own as it resulted in files being appended to, instead of overwritten)
+                  ;; (which was problematic on its own, as it resulted in files being appended to, instead of overwritten)
                   (write-file! cache-filename
                                (read-file! cache-filename)
                                (make-merge-fn cache-atom)))

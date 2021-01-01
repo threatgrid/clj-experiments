@@ -28,9 +28,9 @@ Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide 
 
 ```clj
 ;; Installing this plugin under the :repl profile is most recommended for best performance,
-;; especially if you work on a monorepo with a complex build process.  
+;; especially if you work with a monorepo with a complex build process.  
 :repl {:middleware [leiningen.resolve-java-sources-and-javadocs/add]
-       :plugins [[threatgrid/resolve-java-sources-and-javadocs "0.1.12"]]
+       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "0.1.12"]]
        ;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
        :resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}}
 
@@ -38,7 +38,7 @@ Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide 
 
 > If adding this middleware on a per-project basis, make sure it's not turned on by default, simply because other people might not appreciate a slower (first) dependency resolution for a functionality that they might not use. [Profiles](https://github.com/technomancy/leiningen/blob/master/doc/PROFILES.md) help.  
 
-After that, `lein repl` and similar commands will download each artifact of your dependency tree with `"sources"` and `"javadoc"` Maven qualifiers, if such an artifact exists (normally these only exist for Java dependencies, not Clojure ones), and place it in the classpath for your REPL process. 
+After that, `lein repl` and similar commands will download each artifact of your dependency tree with `"sources"` and `"javadoc"` Maven classifiers, if such an artifact exists (normally these only exist for Java dependencies, not Clojure ones), and place it in the classpath for your REPL process. 
 
 ## Notes on caching
 
