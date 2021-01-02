@@ -3,14 +3,15 @@
    [cemerick.pomegranate.aether]
    [clojure.string :as string]
    [fipp.clojure]
-   [leiningen.resolve-java-sources-and-javadocs.collections :refer [divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
+   [leiningen.resolve-java-sources-and-javadocs.collections :refer [add-exclusions-if-classified divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
    [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]])
   (:import
    (java.io File)
    (java.net InetAddress UnknownHostException URI)
    (java.nio ByteBuffer)
    (java.nio.channels FileChannel FileLock)
-   (java.nio.file Paths StandardOpenOption)))
+   (java.nio.file Paths StandardOpenOption)
+   (java.util.concurrent ExecutionException)))
 
 (def ^String cache-filename
   (-> "user.home"
@@ -136,19 +137,35 @@
         serialize
         ppr-str)))
 
+(defn resolve-with-timeout! [coordinates repositories]
+  {:pre [(vector? coordinates)
+         (-> coordinates count #{1})]}
+  (try
+    (deref (future
+             (cemerick.pomegranate.aether/resolve-dependencies :coordinates coordinates
+                                                               :repositories repositories))
+           ;; timing out should be very rare, it's not here for a strong reason
+           27500
+           ::timed-out)
+    (catch ExecutionException e
+      (-> e .getCause throw))))
+
 (defn resolve! [cache-atom repositories classifiers x]
   (let [v (or (get @cache-atom x)
               (get @cache-atom (maybe-normalize x))
               (try
                 (debug (str ::resolving " " (pr-str x)))
-                (let [v (cemerick.pomegranate.aether/resolve-dependencies :coordinates x
-                                                                          :repositories repositories)
+                (let [x (mapv add-exclusions-if-classified x)
+                      v (resolve-with-timeout! x repositories)
                       [x] x]
-                  (when (and (find v x)
-                             (-> x (get 3) classifiers))
-                    (info (str ::found " " (pr-str x))))
-                  ;; ensure the cache gets set to something:
-                  (doto v assert))
+                  (if (= v ::timed-out)
+                    []
+                    (do
+                      (when (and (find v x)
+                                 (-> x (get 3) classifiers))
+                        (info (str ::found " " (pr-str x))))
+                      ;; ensure the cache gets set to something:
+                      (doto v assert))))
                 (catch AbstractMethodError e
                   ;; Catches:
 
@@ -169,7 +186,7 @@
                       (-> e .printStackTrace)
                       nil)))
                 (finally
-                  (debug (str ::resolved " " (pr-str x))))))]
+                  (debug (str ::resolved "  " (pr-str x))))))]
     (when v
       (swap! cache-atom assoc x v))
     v))

@@ -74,6 +74,29 @@
        (mapcat (fn [[k v]]
                  (apply list k v)))))
 
+(defn add-exclusions-if-classified [coordinate]
+  {:pre [(vector? coordinate)
+         (not (vector? (first coordinate)))]}
+  (let [catchall '[[*]]]
+
+    (if-not (some #{:classifier} coordinate)
+      coordinate
+      (let [maybe-with-catchall-exclusions (cond-> coordinate
+                                             (not (some #{:exclusions} coordinate))
+                                             (conj :exclusions catchall))]
+        (->> maybe-with-catchall-exclusions
+
+             (reduce (fn [{:keys [found? result]} x]
+                       (if found?
+                         {:found? false
+                          :result (conj result catchall)}
+                         {:found? (= x :exclusions)
+                          :result (conj result x)}))
+                     {:found? false
+                      :result []})
+
+             (:result))))))
+
 ;; Vendored (and modified) code, for avoiding depending on clojure.spec
 ;; ...Lein can run old Clojure versions predating Spec.
 (defn divide-by

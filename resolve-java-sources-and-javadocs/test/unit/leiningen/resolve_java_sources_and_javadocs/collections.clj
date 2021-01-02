@@ -36,3 +36,16 @@
         [[[clojure-complete "0.2.4" :exclusions [org.clojure/clojure]]] [[[clojure-complete "0.2.4" :exclusions [[org.clojure/clojure]]] nil]]]]
       '([[[clojure-complete "0.2.4" :exclusions [[org.clojure/clojure]]]] [[[clojure-complete "0.2.4" :exclusions [[org.clojure/clojure]]] nil]]]
         [[[clojure-complete "0.2.4" :exclusions [org.clojure/clojure]]] [[[clojure-complete "0.2.4" :exclusions [[org.clojure/clojure]]] nil]]]))))
+
+(deftest add-exclusions-if-classified
+  (are [input expected] (testing input
+                          (is (= expected
+                                 (sut/add-exclusions-if-classified input)))
+                          true)
+    []                                                []
+    '[foo]                                            '[foo]
+    '[foo nil]                                        '[foo nil]
+    '[foo "2"]                                        '[foo "2"]
+    '[foo "2" :exclusions [a]]                        '[foo "2" :exclusions [a]]
+    '[foo "2" :classifier "sources"]                  '[foo "2" :classifier "sources" :exclusions [[*]]]
+    '[foo "2" :exclusions ['a] :classifier "sources"] '[foo "2" :exclusions [[*]] :classifier "sources"]))
