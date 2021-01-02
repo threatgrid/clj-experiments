@@ -59,6 +59,7 @@
     "amazonica"     vanilla-lein-deps
     "carmine"       vanilla-lein-deps
     "cassaforte"    vanilla-lein-deps
+    "cider-nrepl"   vanilla-lein-deps
     "elastisch"     vanilla-lein-deps
     "http-kit"      vanilla-lein-deps
     "jackdaw"       vanilla-lein-deps
@@ -118,11 +119,16 @@
                                                         (/ 60000.0))))
      ret#))
 
+(def parallelism-factor
+  (-> "leiningen.resolve-java-sources-and-javadocs.test.parallelism"
+      (System/getProperty "1")
+      read-string))
+
 (defn run-repos! [f]
   (assert (seq commands))
   (->> commands
 
-       (divide-by 4)
+       (divide-by parallelism-factor)
 
        (pmap (fn [chunks]
                (->> chunks
@@ -133,7 +139,7 @@
                                                            (apply sh (into command
                                                                            [:dir (io/file "integration-testing" id)
                                                                             :env env])))]
-                              (assert (zero? exit) err)
+                              (assert (zero? exit) [id (pr-str (-> err (doto println)))])
                               (let [lines (->> out string/split-lines (filter (fn [s]
                                                                                 (string/includes? s "leiningen.resolve-java-sources-and-javadocs"))))
                                     good (->> lines (filter (fn [s]
@@ -144,17 +150,14 @@
                                                              ;; #{"sources"} is specified in `#'prelude`
                                                              (string/includes? s ":classifier \"javadoc\""))))]
                                 (assert (empty? bad)
-                                        (pr-str bad))
+                                        (pr-str [id bad]))
                                 (f id good)
-                                (info "\n")
+                                (info "")
                                 id)))))))
 
        (apply concat)
 
        doall))
-
-(defn delete-file! []
-  (-> leiningen.resolve-java-sources-and-javadocs/cache-filename File. .delete))
 
 (defn suite []
 
@@ -163,12 +166,15 @@
 
   (sh "lein" "install" :dir (System/getProperty "user.dir") :env env)
 
-  (delete-file!)
+  (-> leiningen.resolve-java-sources-and-javadocs/cache-filename File. .delete)
 
   (run-repos! (fn [id good-lines]
-                (assert (seq good-lines)
-                        (format "Finds sources in %s" id))
-                (info (format "Found %s sources in %s"
+                (when (#{1} parallelism-factor)
+                  ;; This assertion cannot be guaranteed in parallel runs, since different orderings mean work can get "stolen"
+                  ;; from one project to another (which is perfectly normal and desirable)
+                  (assert (seq good-lines)
+                          (format "Finds sources in %s" id)))
+                (info (format "Found %s sources in %s."
                               (count good-lines)
                               id))))
 

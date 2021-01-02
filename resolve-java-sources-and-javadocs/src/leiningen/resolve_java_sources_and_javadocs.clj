@@ -1,17 +1,16 @@
 (ns leiningen.resolve-java-sources-and-javadocs
   (:require
    [cemerick.pomegranate.aether]
+   [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.walk :as walk]
    [fipp.clojure]
    [leiningen.resolve-java-sources-and-javadocs.collections :refer [add-exclusions-if-classified divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
    [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]])
   (:import
-   (java.io File)
+   (java.io File RandomAccessFile)
    (java.net InetAddress UnknownHostException URI)
-   (java.nio ByteBuffer)
-   (java.nio.channels FileChannel FileLock)
-   (java.nio.file Paths StandardOpenOption)
+   (java.nio.channels FileLock)
    (java.util.concurrent ExecutionException)))
 
 (def ^String cache-filename
@@ -27,64 +26,37 @@
   This lock guards against in-process concurrent acquisition of a FileLock, which would otherwise throw a `java.nio.channels.OverlappingFileLockException`."
   (Object.))
 
-(defn read-file!
-  "Reads a file, while holding a file-level read-lock.
-
-  Waits when a writer is holding the lock.
-
-  These file locks guard against concurrent Lein executions, which could otherwise corrupt a given file."
-  ^String
-  [filename]
+(defn locking-file [^String filename f]
   (locking in-process-lock
-    (let [^FileChannel c (FileChannel/open (Paths/get filename (into-array String []))
-                                           (into-array StandardOpenOption [StandardOpenOption/READ]))]
-      (if-let [^FileLock read-lock (-> c (.tryLock 0 Long/MAX_VALUE true))]
-        (let [size (-> c .size)
-              buffer (ByteBuffer/allocate size)]
+    (with-open [raf (-> filename io/file (RandomAccessFile. "rw"))
+                channel (-> raf .getChannel)]
+      (loop [retry 0]
+        (if-let [^FileLock lock (-> channel .tryLock)]
           (try
-            (-> c (.read buffer))
-            (-> buffer .array String.)
+            (f (slurp filename))
             (finally
-              (-> read-lock .release)
-              (-> c .close))))
-        (do
-          (Thread/sleep 50)
-          (read-file! filename))))))
+              (-> lock .release)))
+          (if (= retry 1000)
+            (throw (Exception. "Locked by other thread or process."))
+            (do
+              (Thread/sleep 5)
+              (recur (inc retry)))))))))
 
-(defn write-file!
-  "Writes to a file, while holding a file-level write-lock.
-  `merge-fn` will be invoked for deriving a new string value out of `prev-content`
-  (or new file contents, if lock acquisition failed).
+(defn read-file! [filename]
+  (locking-file filename identity))
 
-  Refer to `java.nio.channels.FileLock` for details in shared vs. exclusive locks."
-  ^String
-  [^String filename, ^String prev-content, merge-fn]
-  (locking in-process-lock
-    (let [^FileChannel c (FileChannel/open (Paths/get filename (into-array String []))
-                                           (into-array StandardOpenOption [StandardOpenOption/WRITE
-                                                                           StandardOpenOption/CREATE
-                                                                           StandardOpenOption/TRUNCATE_EXISTING]))]
-      (if-let [^FileLock write-lock (-> c (.tryLock 0 Long/MAX_VALUE false))]
-        (let [^bytes content (-> prev-content ^String (merge-fn) .getBytes)
-              size (-> content alength)
-              newval (ByteBuffer/wrap content 0 size)]
-          (try
-            (-> c (.write newval))
-            (String. content)
-            (finally
-              (-> write-lock .release)
-              (-> c .close))))
-        (do
-          (Thread/sleep 50)
-          (write-file! filename (read-file! filename) merge-fn))))))
-
+(defn write-file! [filename merge-fn]
+  (locking-file filename (fn [s]
+                           (let [v (merge-fn s)]
+                             (spit filename v)
+                             v))))
 (defn serialize
   "Turns any contained coll into a vector, sorting it.
 
   This ensures that stable values are peristed to the file caches."
   [x]
-  {:pre  [(not (string? x))]
-   :post [(not (string? %))]}
+  {:pre  [(map? x)]
+   :post [(vector? %)]}
   (->> x
        (mapv (fn outer [[k v]]
                [(ensure-no-lists k)
@@ -104,8 +76,8 @@
 
   Note that only certain vectors must be turned back into hashmaps - others must remain as-is."
   [x]
-  {:pre  [(not (string? x))]
-   :post [(not (string? %))]}
+  {:post [(map? %)]}
+  (assert (vector? x) (class x))
   (->> x
        (map (fn [[k v]]
               [k (if (and v (empty? v))
@@ -118,9 +90,12 @@
        (into {})))
 
 (defn safe-read-string [x]
+  {:pre [(string? x)]}
   (if (string/blank? x)
-    {}
-    (read-string x)))
+    []
+    (let [v (read-string x)]
+      (assert (vector? v))
+      v)))
 
 (defn ppr-str [x]
   (with-out-str
@@ -294,7 +269,7 @@
         repositories  (into {}
                             (remove private-repository?)
                             repositories)
-        initial-cache-value (-> (read-file! cache-filename) safe-read-string deserialize)
+        initial-cache-value (-> cache-filename read-file! safe-read-string deserialize)
         cache-atom (atom initial-cache-value)]
     (update project
             :dependencies
@@ -320,17 +295,7 @@
                                    (mapv (fn [x]
                                            (conj x :exclusions '[[*]]))))]
                 (when-not (= initial-cache-value @cache-atom)
-                  ;; NOTE: there's a negligible race condition here
-                  ;; (as there's a window between read time and write time in which no lock is held).
-                  ;; the likelihood for it is very low (`lein deps` takes seconds if not minutes,
-                  ;; while the window for a race is of about 1ms).
-                  ;; At most one risks dropping some additions (which can always be re-cached later),
-                  ;; but no actual issues/errors can arise.
-
-                  ;; A possible fix would be to make `write-file!` also use StandardOpenOption/READ
-                  ;; (which was problematic on its own, as it resulted in files being appended to, instead of overwritten)
                   (write-file! cache-filename
-                               (read-file! cache-filename)
                                (make-merge-fn cache-atom)))
                 ;; order can be sensitive
                 (into additions deps))))))

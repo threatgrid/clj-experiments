@@ -23,7 +23,6 @@
       (try
         (are [input expected] (testing input
                                 (let [v (sut/write-file! filename
-                                                         (sut/read-file! filename)
                                                          (sut/make-merge-fn state))]
 
                                   (is (= expected v))
@@ -43,7 +42,5 @@
            (count form))
         "Sanity check")
     (is (not= form serialized))
-    (is (= (-> form sut/serialize)
-           (-> form sut/serialize sut/serialize)))
     (is (= form
            (-> serialized sut/deserialize)))))
