@@ -2,6 +2,7 @@
   (:require
    [cemerick.pomegranate.aether]
    [clojure.string :as string]
+   [clojure.walk :as walk]
    [fipp.clojure]
    [leiningen.resolve-java-sources-and-javadocs.collections :refer [add-exclusions-if-classified divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
    [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]])
@@ -154,12 +155,20 @@
   (let [v (or (get @cache-atom x)
               (get @cache-atom (maybe-normalize x))
               (try
-                (debug (str ::resolving " " (pr-str x)))
-                (let [x (mapv add-exclusions-if-classified x)
+                (let [x (->> x
+                             (walk/postwalk (fn [item]
+                                              (cond-> item
+                                                (and (vector? item)
+                                                     (some #{:classifier} item))
+
+                                                add-exclusions-if-classified))))
+                      _ (debug (str ::resolving " " (pr-str x)))
                       v (resolve-with-timeout! x repositories)
                       [x] x]
                   (if (= v ::timed-out)
-                    []
+                    (do
+                      (info (str ::timed-out " " x))
+                      [])
                     (do
                       (when (and (find v x)
                                  (-> x (get 3) classifiers))
@@ -276,6 +285,8 @@
             {:keys [classifiers]
              :or   {classifiers #{"javadoc" "sources"}}} :resolve-java-sources-and-javadocs
             :as                                          project}]
+
+  (debug (str [::classifiers classifiers]))
 
   (-> cache-filename java.io.File. .createNewFile)
 

@@ -34,3 +34,39 @@
 [submodule "resolve-java-sources-and-javadocs/integration-testing/schema"]
 	path = resolve-java-sources-and-javadocs/integration-testing/schema
 	url = git@github.com:plumatic/schema.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/amazonica"]
+	path = resolve-java-sources-and-javadocs/integration-testing/amazonica
+	url = git@github.com:mcohen01/amazonica.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/quartzite"]
+	path = resolve-java-sources-and-javadocs/integration-testing/quartzite
+	url = git@github.com:michaelklishin/quartzite.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/langohr"]
+	path = resolve-java-sources-and-javadocs/integration-testing/langohr
+	url = git@github.com:michaelklishin/langohr.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/monger"]
+	path = resolve-java-sources-and-javadocs/integration-testing/monger
+	url = git@github.com:michaelklishin/monger.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/cassaforte"]
+	path = resolve-java-sources-and-javadocs/integration-testing/cassaforte
+	url = git@github.com:clojurewerkz/cassaforte.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/elastisch"]
+	path = resolve-java-sources-and-javadocs/integration-testing/elastisch
+	url = git@github.com:clojurewerkz/elastisch.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/machine_head"]
+	path = resolve-java-sources-and-javadocs/integration-testing/machine_head
+	url = git@github.com:clojurewerkz/machine_head.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/welle"]
+	path = resolve-java-sources-and-javadocs/integration-testing/welle
+	url = git@github.com:michaelklishin/welle.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/carmine"]
+	path = resolve-java-sources-and-javadocs/integration-testing/carmine
+	url = git@github.com:ptaoussanis/carmine.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/http-kit"]
+	path = resolve-java-sources-and-javadocs/integration-testing/http-kit
+	url = git@github.com:http-kit/http-kit.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/trapperkeeper"]
+	path = resolve-java-sources-and-javadocs/integration-testing/trapperkeeper
+	url = git@github.com:puppetlabs/trapperkeeper.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/jackdaw"]
+	path = resolve-java-sources-and-javadocs/integration-testing/jackdaw
+	url = git@github.com:FundingCircle/jackdaw.git

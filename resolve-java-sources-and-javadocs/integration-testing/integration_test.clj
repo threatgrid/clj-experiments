@@ -1,13 +1,19 @@
 (ns integration-test
+  (:refer-clojure :exclude [time])
   (:require
    [clojure.java.io :as io]
    [clojure.java.shell :refer [sh]]
    [clojure.string :as string]
-   [leiningen.resolve-java-sources-and-javadocs])
+   [leiningen.resolve-java-sources-and-javadocs]
+   [leiningen.resolve-java-sources-and-javadocs.collections :refer [divide-by]]
+   [leiningen.resolve-java-sources-and-javadocs.logging :refer [info]])
   (:import
    (java.io File)))
 
-(def env (dissoc (into {} (System/getenv)) "CLASSPATH"))
+(def env (-> (into {} (System/getenv))
+             (dissoc "CLASSPATH")
+             ;; for Lein logging:
+             (assoc "DEBUG" "true")))
 
 (def lein (->> [(-> "user.home"
                     (System/getProperty)
@@ -26,7 +32,7 @@
 
 (assert (string? project-version))
 
-(defn prelude [x & [skip-pedantic?]]
+(defn prelude [x]
   (cond-> [x
            "with-profile" "-user"
 
@@ -37,82 +43,115 @@
            "--"
 
            "update-in"
-           ":middleware" "conj" "leiningen.resolve-java-sources-and-javadocs/add"
+           ":" "assoc" ":resolve-java-sources-and-javadocs" "{:classifiers #{\"sources\"}}"
            "--"
 
            "update-in"
-           ":" "assoc" ":resolve-java-sources-and-javadocs" "{:classifiers #{\"sources\"}}"
-           "--"]
-    ;; There is only one instance where we skip :pedantic? (namely: Pedestal), because it's stricly a false alarm:
-    ;; it complains about an x being ambiguous vs. x
-    ;; (i.e. same coordinates, classifiers, everything) - must be a minor Lein bug.
+           ":middleware" "conj" "leiningen.resolve-java-sources-and-javadocs/add"
+           "--"]))
 
-    ;; ...This issue can only be reproduced with `lein update-in`, not with `lein with-profile +repl`,
-    ;; which is how the plugin will be actually used anyway
-
-    ;; (this test ns uses `lein update-in` because it allows to skip ~/.lein, and also <project>/profiles.clj,
-    ;; which can interfere)
-    skip-pedantic? (conj "update-in"
-                         ":" "assoc" ":pedantic?" "false"
-                         "--")))
+(def vanilla-lein-deps
+  (conj (prelude lein) "deps"))
 
 (def commands
-  {"metabase"      (conj (prelude lein) "deps")
-   "riemann"       (conj (prelude lein) "deps")
-   "pallet"        (conj (prelude lein) "deps")
-   "aleph"         (conj (prelude lein) "deps")
-   ;; uses various plugins:
-   "schema"        (conj (prelude lein) "deps")
-   ;; uses lein-localrepo:
-   "jepsen/jepsen" (conj (prelude lein) "deps")
-   ;; uses lein-tools-deps:
-   "overtone"      (conj (prelude lein) "deps")
-   ;; uses lein-sub, lein-modules:
-   "incanter"      (reduce into [(prelude lein)
-                                 ["sub" "do"]
-                                 (prelude "install,")
-                                 ["deps"]])
-   ;; uses lein-sub:
-   "icepick"       (reduce into [(prelude lein)
-                                 (prelude "sub")
-                                 ["deps"]])
-   ;; uses lein-sub:
-   "crux"          (reduce into [(prelude lein)
-                                 (prelude "sub")
-                                 ["deps"]])
-   ;; uses lein-sub:
-   "pedestal"      (reduce into [(prelude lein)
-                                 ["sub" "do"]
-                                 (prelude "install," true)
-                                 ["deps"]])
-   ;; uses lein-monolith:
-   "sparkplug"     (reduce into [(prelude lein)
-                                 ["monolith"]
-                                 (prelude "each")
-                                 ["do"
-                                  "clean,"
-                                  "install,"
-                                  "deps"]])})
+  (sort ;; ensure stable tests
+   {"aleph"         vanilla-lein-deps
+    "amazonica"     vanilla-lein-deps
+    "carmine"       vanilla-lein-deps
+    "cassaforte"    vanilla-lein-deps
+    "elastisch"     vanilla-lein-deps
+    "http-kit"      vanilla-lein-deps
+    "jackdaw"       vanilla-lein-deps
+    "langohr"       vanilla-lein-deps
+    "machine_head"  vanilla-lein-deps
+    "metabase"      vanilla-lein-deps
+    "monger"        vanilla-lein-deps
+    "pallet"        vanilla-lein-deps
+    "quartzite"     vanilla-lein-deps
+    "riemann"       vanilla-lein-deps
+    "welle"         vanilla-lein-deps
+    ;; uses various plugins:
+    "schema"        vanilla-lein-deps
+    ;; uses lein-parent:
+    "trapperkeeper" vanilla-lein-deps
+    ;; uses lein-parent:
+    "jepsen/jepsen" vanilla-lein-deps
+    ;; uses lein-tools-deps:
+    "overtone"      vanilla-lein-deps
+    ;; uses lein-sub, lein-modules:
+    "incanter"      (reduce into [(prelude lein)
+                                  ["sub" "do"]
+                                  (prelude "install,")
+                                  ["deps"]])
+    ;; uses lein-sub:
+    "icepick"       (reduce into [(prelude lein)
+                                  (prelude "sub")
+                                  ["deps"]])
+    ;; uses lein-sub:
+    "crux"          (reduce into [(prelude lein)
+                                  (prelude "sub")
+                                  ["deps"]])
+    ;; uses lein-sub:
+    "pedestal"      (reduce into [(prelude lein)
+                                  ["sub" "do"]
+                                  (prelude "install,")
+                                  ["deps"]])
+    ;; uses lein-monolith:
+    "sparkplug"     (reduce into [(prelude lein)
+                                  ["monolith"]
+                                  (prelude "each")
+                                  ["do"
+                                   "clean,"
+                                   "install,"
+                                   "deps"]])}))
+
+(defmacro time
+  {:style/indent 1}
+  [id expr]
+  `(let [start# (. System (nanoTime))
+         ret# ~expr]
+     (println (format "Ran %s in %.2f minutes." ~id (-> System
+                                                        (. (nanoTime))
+                                                        (- start#)
+                                                        double
+                                                        (/ 1000000.0)
+                                                        (/ 60000.0))))
+     ret#))
 
 (defn run-repos! [f]
   (assert (seq commands))
-  (doseq [[id command] commands
-          :let [_ (println "Exercising" id)
-                _ (pr command)
-                _ (println)
-                {:keys [out exit err]} (apply sh (into command
-                                                       [:dir (io/file "integration-testing" id)
-                                                        :env env]))]]
-    (assert (zero? exit) err)
-    (let [lines (->> out string/split-lines (filter (fn [s]
-                                                      (string/includes? s "leiningen.resolve-java-sources-and-javadocs"))))
-          good (->> lines (filter (fn [s]
-                                    (string/includes? s "found"))))
-          bad (->> lines (filter (fn [s]
-                                   (string/includes? s "could"))))]
-      (assert (empty? bad))
-      (f id good)
-      (println))))
+  (->> commands
+
+       (divide-by 4)
+
+       (pmap (fn [chunks]
+               (->> chunks
+                    (mapv (fn [[id command]]
+                            (let [_ (info (str "Exercising " id))
+                                  _ (info (pr-str command))
+                                  {:keys [out exit err]} (time id
+                                                           (apply sh (into command
+                                                                           [:dir (io/file "integration-testing" id)
+                                                                            :env env])))]
+                              (assert (zero? exit) err)
+                              (let [lines (->> out string/split-lines (filter (fn [s]
+                                                                                (string/includes? s "leiningen.resolve-java-sources-and-javadocs"))))
+                                    good (->> lines (filter (fn [s]
+                                                              (string/includes? s "/found"))))
+                                    bad (->> lines (filter (fn [s]
+                                                             (string/includes? s "/could-not")
+                                                             (string/includes? s "/timed-out")
+                                                             ;; #{"sources"} is specified in `#'prelude`
+                                                             (string/includes? s ":classifier \"javadoc\""))))]
+                                (assert (empty? bad)
+                                        (pr-str bad))
+                                (f id good)
+                                (info "\n")
+                                id)))))))
+
+       (apply concat)
+
+       doall))
 
 (defn delete-file! []
   (-> leiningen.resolve-java-sources-and-javadocs/cache-filename File. .delete))
@@ -129,9 +168,10 @@
   (run-repos! (fn [id good-lines]
                 (assert (seq good-lines)
                         (format "Finds sources in %s" id))
-                (println (format "Found %s sources in %s"
-                                 (count good-lines)
-                                 id))))
+                (info (format "Found %s sources in %s"
+                              (count good-lines)
+                              id))))
+
   (run-repos! (fn [_ good-lines]
                 (assert (empty? good-lines)
                         "Caches the findings")))
@@ -142,5 +182,13 @@
                         "The cache only accretes - other projects' cache building doesn't undo prior work"))))
 
 (defn -main [& _]
+
+  (Thread/setDefaultUncaughtExceptionHandler
+   (reify Thread$UncaughtExceptionHandler
+     (uncaughtException [_ thread ex]
+       (-> ex .printStackTrace)
+       (System/exit 1))))
+
   (suite)
+  (shutdown-agents)
   (System/exit 0))
