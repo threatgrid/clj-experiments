@@ -15,7 +15,10 @@
        first))
 
 (defn normalize-exclusions [exclusions]
-  {:pre [(sequential? exclusions)]}
+  (assert (or (sequential? exclusions)
+              ;; very unusual edge case:
+              (set? exclusions))
+          (pr-str exclusions))
   (->> exclusions
        (mapv (fn [x]
                (cond-> x

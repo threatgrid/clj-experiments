@@ -1,0 +1,36 @@
+[submodule "resolve-java-sources-and-javadocs/integration-testing/pallet"]
+	path = resolve-java-sources-and-javadocs/integration-testing/pallet
+	url = git@github.com:pallet/pallet.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/riemann"]
+	path = resolve-java-sources-and-javadocs/integration-testing/riemann
+	url = git@github.com:riemann/riemann.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/crux"]
+	path = resolve-java-sources-and-javadocs/integration-testing/crux
+	url = git@github.com:juxt/crux.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/metabase"]
+	path = resolve-java-sources-and-javadocs/integration-testing/metabase
+	url = git@github.com:metabase/metabase.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/sparkplug"]
+	path = resolve-java-sources-and-javadocs/integration-testing/sparkplug
+	url = git@github.com:amperity/sparkplug.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/overtone"]
+	path = resolve-java-sources-and-javadocs/integration-testing/overtone
+	url = git@github.com:overtone/overtone.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/jepsen"]
+	path = resolve-java-sources-and-javadocs/integration-testing/jepsen
+	url = git@github.com:jepsen-io/jepsen.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/pedestal"]
+	path = resolve-java-sources-and-javadocs/integration-testing/pedestal
+	url = git@github.com:pedestal/pedestal.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/aleph"]
+	path = resolve-java-sources-and-javadocs/integration-testing/aleph
+	url = git@github.com:clj-commons/aleph.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/incanter"]
+	path = resolve-java-sources-and-javadocs/integration-testing/incanter
+	url = git@github.com:incanter/incanter.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/icepick"]
+	path = resolve-java-sources-and-javadocs/integration-testing/icepick
+	url = git@github.com:frankiesardo/icepick.git
+[submodule "resolve-java-sources-and-javadocs/integration-testing/schema"]
+	path = resolve-java-sources-and-javadocs/integration-testing/schema
+	url = git@github.com:plumatic/schema.git
