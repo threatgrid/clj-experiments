@@ -195,6 +195,14 @@
                          "The cache only accretes - other projects' cache building doesn't undo prior work"
                          (count good-lines)])))
 
+  (let [v (-> sut/cache-filename sut/read-file! sut/safe-read-string)]
+    (assert (= v
+               (-> v sut/deserialize sut/serialize))
+            "Roundtrip")
+    (assert (= v
+               (-> v sut/deserialize sut/serialize sut/deserialize sut/serialize))
+            "Longer roundtrip")))
+
 (defn -main [& _]
 
   (Thread/setDefaultUncaughtExceptionHandler
