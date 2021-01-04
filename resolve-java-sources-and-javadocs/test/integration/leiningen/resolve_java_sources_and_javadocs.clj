@@ -44,3 +44,21 @@
     (is (not= form serialized))
     (is (= form
            (-> serialized sut/deserialize)))))
+
+(deftest acceptable-repository?
+  (are [desc input expected] (testing [desc input]
+                               (is (= expected
+                                      (sut/acceptable-repository? [:_ {:url input}])))
+                               true)
+    "Basic case"
+    "https://example.com"         true
+
+    "Rejects non-existing domains, as they cause timeouts"
+    "https://example.foooooooooo" false
+
+    "Rejects unencrypted HTTP, as Lein would reject it"
+    "http://example.com"          false
+
+    "Rejects git repositories (as used by some plugins),
+since a git repo inherently cannot resolve to a .jar artifact"
+    "git://github.com"            false))

@@ -276,15 +276,18 @@
     1
     4))
 
-(defn private-repository? [[_ {:keys [url] :as x}]]
+(defn acceptable-repository? [[_ {:keys [url] :as x}]]
   (or (->> x keys (some #{:password}))
       ;; Some domains may be behind under a VPN we are disconnected from:
       (try
-        (when-let [{:keys [host]} (some-> url URI. bean)]
-          (InetAddress/getByName host)
-          false)
+        (when-let [{:keys [host scheme]} (some-> url URI. bean)]
+          (if-not (#{"https"} scheme)
+            false
+            (do
+              (InetAddress/getByName host)
+              true)))
         (catch UnknownHostException _
-          true))))
+          false))))
 
 (defn add [{:keys                                        [repositories managed-dependencies]
             {:keys [classifiers]
@@ -298,7 +301,7 @@
 
   (let [classifiers (set classifiers)
         repositories  (into {}
-                            (remove private-repository?)
+                            (filter  acceptable-repository?)
                             repositories)
         initial-cache-value (-> cache-filename read-file! safe-read-string deserialize)
         cache-atom (atom initial-cache-value)]
