@@ -4,7 +4,7 @@
    [clojure.java.io :as io]
    [clojure.java.shell :refer [sh]]
    [clojure.string :as string]
-   [leiningen.resolve-java-sources-and-javadocs]
+   [leiningen.resolve-java-sources-and-javadocs :as sut]
    [leiningen.resolve-java-sources-and-javadocs.collections :refer [divide-by]]
    [leiningen.resolve-java-sources-and-javadocs.logging :refer [info]])
   (:import
@@ -125,6 +125,7 @@
       read-string))
 
 (defn run-repos! [f]
+  (assert (pos? parallelism-factor))
   (assert (seq commands))
   (->> commands
 
@@ -136,12 +137,14 @@
                             (let [_ (info (str "Exercising " id))
                                   _ (info (pr-str command))
                                   {:keys [out exit err]} (time id
-                                                           (apply sh (into command
-                                                                           [:dir (io/file "integration-testing" id)
-                                                                            :env env])))]
+                                                               (apply sh (into command
+                                                                               [:dir (io/file "integration-testing" id)
+                                                                                :env env])))]
                               (assert (zero? exit) [id (pr-str (-> err (doto println)))])
-                              (let [lines (->> out string/split-lines (filter (fn [s]
-                                                                                (string/includes? s "leiningen.resolve-java-sources-and-javadocs"))))
+                              (let [lines (->> out
+                                               string/split-lines
+                                               (filter (fn [s]
+                                                         (string/includes? s "leiningen.resolve-java-sources-and-javadocs"))))
                                     good (->> lines (filter (fn [s]
                                                               (string/includes? s "/found"))))
                                     bad (->> lines (filter (fn [s]
@@ -166,7 +169,7 @@
 
   (sh "lein" "install" :dir (System/getProperty "user.dir") :env env)
 
-  (-> leiningen.resolve-java-sources-and-javadocs/cache-filename File. .delete)
+  (-> sut/cache-filename File. .delete)
 
   (run-repos! (fn [id good-lines]
                 (when (#{1} parallelism-factor)
@@ -178,14 +181,19 @@
                               (count good-lines)
                               id))))
 
-  (run-repos! (fn [_ good-lines]
+  (run-repos! (fn [id good-lines]
                 (assert (empty? good-lines)
-                        "Caches the findings")))
+                        [id
+                         "Caches the findings"
+                         (count good-lines)])))
 
   ;; Run one last time, proving that a given project's cache building is accretive:
-  (run-repos! (fn [_ good-lines]
+  (run-repos! (fn [id good-lines]
+                (run! info good-lines)
                 (assert (empty? good-lines)
-                        "The cache only accretes - other projects' cache building doesn't undo prior work"))))
+                        [id
+                         "The cache only accretes - other projects' cache building doesn't undo prior work"
+                         (count good-lines)])))
 
 (defn -main [& _]
 
@@ -196,5 +204,7 @@
        (System/exit 1))))
 
   (suite)
+
   (shutdown-agents)
+
   (System/exit 0))

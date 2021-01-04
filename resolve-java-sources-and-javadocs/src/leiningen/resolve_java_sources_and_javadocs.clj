@@ -20,20 +20,24 @@
       (str)))
 
 (def in-process-lock
-  "Although Lein invocation concurrency is primarily inter-process, it can also be in-process:
-  https://github.com/amperity/lein-monolith/blob/47e31f3081dafc517b533ff927be3c7fed0e12dd/src/lein_monolith/task/each.clj#L345-L347
+  "Although Lein invocation concurrency is primarily inter-process, it can also be in-process: https://git.io/JLdS8
 
-  This lock guards against in-process concurrent acquisition of a FileLock, which would otherwise throw a `java.nio.channels.OverlappingFileLockException`."
+  This lock guards against in-process concurrent acquisition of a FileLock,
+  which would otherwise throw a `java.nio.channels.OverlappingFileLockException`."
   (Object.))
 
-(defn locking-file [^String filename f]
+(defn locking-file
+  "These file locks guard against concurrent Lein executions, which could otherwise corrupt a given file."
+  [^String filename f]
   (locking in-process-lock
-    (with-open [raf (-> filename io/file (RandomAccessFile. "rw"))
+    (with-open [raf (-> filename io/file (RandomAccessFile. "rws"))
                 channel (-> raf .getChannel)]
       (loop [retry 0]
         (if-let [^FileLock lock (-> channel .tryLock)]
           (try
-            (f (slurp filename))
+            (assert (not (-> lock .isShared)))
+            (f (slurp filename)
+               raf)
             (finally
               (-> lock .release)))
           (if (= retry 1000)
@@ -43,13 +47,21 @@
               (recur (inc retry)))))))))
 
 (defn read-file! [filename]
-  (locking-file filename identity))
+  (locking-file filename (fn [s _]
+                           s)))
 
 (defn write-file! [filename merge-fn]
-  (locking-file filename (fn [s]
-                           (let [v (merge-fn s)]
-                             (spit filename v)
+  (locking-file filename (fn [^String s, ^RandomAccessFile raf]
+                           (let [^String v (merge-fn s)]
+                             (when-not (= s v)
+                               (assert (> (-> v .length)
+                                          (-> s .length))
+                                       "Cache file sizes should only grow")
+                               (-> raf (.setLength 0))
+                               (-> raf (.writeBytes v))
+                               (-> raf .getChannel (.force true)))
                              v))))
+
 (defn serialize
   "Turns any contained coll into a vector, sorting it.
 
@@ -90,12 +102,17 @@
        (into {})))
 
 (defn safe-read-string [x]
-  {:pre [(string? x)]}
+  {:pre  [(string? x)]
+   :post [(vector? %)]}
   (if (string/blank? x)
-    []
-    (let [v (read-string x)]
-      (assert (vector? v))
-      v)))
+    (do
+      (assert (not-any? (comp zero? byte) x)
+              "No ASCII NUL characters should be persisted")
+      [])
+    (try
+      (read-string x)
+      (catch Exception e
+        (throw (ex-info "Couldn't read-string this string" {:x x}))))))
 
 (defn ppr-str [x]
   (with-out-str
@@ -106,12 +123,20 @@
   (fn [^String prev-val]
     {:pre  [(string? prev-val)]
      :post [(string? %)]}
-    (-> prev-val
-        safe-read-string
-        deserialize
-        (merge @cache-atom)
-        serialize
-        ppr-str)))
+    (let [old-map (-> prev-val safe-read-string deserialize)
+          ks (keys old-map)
+          new-map (merge old-map @cache-atom)
+          serialized (serialize new-map)
+          reserialized (deserialize serialized)]
+      (doseq [k ks]
+        (assert (find reserialized k)
+                (str "Expected newly serialized value to not drop existing key: " (pr-str k)))
+        (when (seq (get old-map k))
+          (assert (seq (get reserialized k))
+                  (str "Expected overriden key to not empty out  a previous value:" (pr-str {:k k
+                                                                                             :o (get old-map k)
+                                                                                             :r (get reserialized k)})))))
+      (ppr-str serialized))))
 
 (defn resolve-with-timeout! [coordinates repositories]
   {:pre [(vector? coordinates)
@@ -268,7 +293,8 @@
 
   (debug (str [::classifiers classifiers]))
 
-  (-> cache-filename java.io.File. .createNewFile)
+  (write-file! cache-filename (fn [s]
+                                (or (not-empty s) "[]")))
 
   (let [classifiers (set classifiers)
         repositories  (into {}
