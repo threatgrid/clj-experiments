@@ -13,17 +13,21 @@
 (def env (-> (into {} (System/getenv))
              (dissoc "CLASSPATH")
              ;; for Lein logging:
-             (assoc "DEBUG" "true")))
+             (assoc "DEBUG" "true")
+             (assoc "LEIN_JVM_OPTS" "-Dclojure.main.report=stderr")))
 
-(def lein (->> [(-> "user.home"
+(def lein (->> [(io/file "/usr" "local" "bin" "lein") ;; github actions
+                (-> "user.home" ;; personal setup
                     (System/getProperty)
                     (io/file "bin" "lein-latest"))
-                (-> "user.home"
+                (-> "user.home" ;; standard
                     (System/getProperty)
                     (io/file "bin" "lein"))]
                (filter (memfn ^File exists))
                first
                str))
+
+(assert (seq lein))
 
 (def project-version (-> "project.clj"
                          slurp
@@ -94,8 +98,7 @@
                                   ["deps"]])
     ;; uses lein-sub:
     "pedestal"      (reduce into [(prelude lein)
-                                  ["sub" "do"]
-                                  (prelude "install,")
+                                  (prelude "sub")
                                   ["deps"]])
     ;; uses lein-monolith:
     "sparkplug"     (reduce into [(prelude lein)
@@ -120,9 +123,16 @@
      ret#))
 
 (def parallelism-factor
-  (-> "leiningen.resolve-java-sources-and-javadocs.test.parallelism"
-      (System/getProperty "1")
-      read-string))
+  (Long/parseLong (or (System/getenv "integration_test_parallelism")
+                      "1")))
+
+(defn submodule-dir ^File [id]
+  (let [dir (io/file "integration-testing" id)]
+    (assert (-> dir .exists) dir)
+    (assert (> (count (file-seq dir))
+               1)
+            dir)
+    dir))
 
 (defn run-repos! [f]
   (assert (pos? parallelism-factor))
@@ -134,13 +144,20 @@
        (pmap (fn [chunks]
                (->> chunks
                     (mapv (fn [[id command]]
-                            (let [_ (info (str "Exercising " id))
+                            (let [dir (submodule-dir id)
+                                  _ (info (str "Exercising " id " in " (-> dir
+                                                                           .getCanonicalPath)))
                                   _ (info (pr-str command))
                                   {:keys [out exit err]} (time id
-                                                               (apply sh (into command
-                                                                               [:dir (io/file "integration-testing" id)
-                                                                                :env env])))]
-                              (assert (zero? exit) [id (pr-str (-> err (doto println)))])
+                                                           (apply sh (into command
+                                                                           [:dir dir
+                                                                            :env env])))
+                                  ok? (zero? exit)]
+                              (assert ok? (when-not ok?
+                                            [id
+                                             exit
+                                             (pr-str (-> out (doto println)))
+                                             (pr-str (-> err (doto println)))]))
                               (let [lines (->> out
                                                string/split-lines
                                                (filter (fn [s]
@@ -168,6 +185,16 @@
     (throw (ex-info "." {})))
 
   (sh "lein" "install" :dir (System/getProperty "user.dir") :env env)
+
+  ;; Pedestal needs separate invocations for `install`, `deps`:
+  (let [{:keys [out exit err]} (apply sh (reduce into [["lein" "with-profile" "-user"
+                                                        "sub" "with-profile" "-user" "install"]
+                                                       [:dir (submodule-dir "pedestal")
+                                                        :env env]]))]
+    (when-not (zero? exit)
+      (println out)
+      (println err)
+      (assert false)))
 
   (-> sut/cache-filename File. .delete)
 
