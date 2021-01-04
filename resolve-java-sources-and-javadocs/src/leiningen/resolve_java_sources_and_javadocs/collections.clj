@@ -24,13 +24,15 @@
                (cond-> x
                  (not (vector? x)) vector)))))
 
-(defn maybe-normalize [x]
+(defn maybe-normalize* [x]
   (->> x
        (walk/postwalk (fn [item]
                         (cond-> item
                           (and (vector? item)
                                (some #{:exclusions} item))
                           (update (inc (index item :exclusions)) normalize-exclusions))))))
+
+(def maybe-normalize (memoize maybe-normalize*))
 
 (defn safe-sort
   "Guards against errors when comparing objects of different classes."
@@ -61,13 +63,15 @@
         (throw e))
       coll)))
 
-(defn ensure-no-lists [x]
+(defn ensure-no-lists* [x]
   {:pre [(vector? x)]}
   (->> x (mapv (fn [y]
                  (let [v (cond-> y
                            (sequential? y) vec)]
                    (cond-> v
-                     (vector? v) ensure-no-lists))))))
+                     (vector? v) ensure-no-lists*))))))
+
+(def ensure-no-lists (memoize ensure-no-lists*))
 
 (defn flatten-deps [xs]
   (->> xs

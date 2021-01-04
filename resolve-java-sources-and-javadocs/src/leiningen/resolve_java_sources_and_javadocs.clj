@@ -126,17 +126,22 @@
     (catch ExecutionException e
       (-> e .getCause throw))))
 
+(defn maybe-add-exclusions* [x]
+  (->> x
+       (walk/postwalk (fn [item]
+                        (cond-> item
+                          (and (vector? item)
+                               (some #{:classifier} item))
+
+                          add-exclusions-if-classified)))))
+
+(def maybe-add-exclusions (memoize maybe-add-exclusions*))
+
 (defn resolve! [cache-atom repositories classifiers x]
   (let [v (or (get @cache-atom x)
               (get @cache-atom (maybe-normalize x))
               (try
-                (let [x (->> x
-                             (walk/postwalk (fn [item]
-                                              (cond-> item
-                                                (and (vector? item)
-                                                     (some #{:classifier} item))
-
-                                                add-exclusions-if-classified))))
+                (let [x (maybe-add-exclusions x)
                       _ (debug (str ::resolving " " (pr-str x)))
                       v (resolve-with-timeout! x repositories)
                       [x] x]
