@@ -98,8 +98,7 @@
                                   ["deps"]])
     ;; uses lein-sub:
     "pedestal"      (reduce into [(prelude lein)
-                                  ["sub" "do"]
-                                  (prelude "install,")
+                                  (prelude "sub")
                                   ["deps"]])
     ;; uses lein-monolith:
     "sparkplug"     (reduce into [(prelude lein)
@@ -128,6 +127,14 @@
       (System/getProperty "1")
       read-string))
 
+(defn submodule-dir ^File [id]
+  (let [dir (io/file "integration-testing" id)]
+    (assert (-> dir .exists) dir)
+    (assert (> (count (file-seq dir))
+               1)
+            dir)
+    dir))
+
 (defn run-repos! [f]
   (assert (pos? parallelism-factor))
   (assert (seq commands))
@@ -138,18 +145,14 @@
        (pmap (fn [chunks]
                (->> chunks
                     (mapv (fn [[id command]]
-                            (let [dir (io/file "integration-testing" id)
-                                  _ (assert (-> dir .exists))
-                                  _ (assert (> (count (file-seq dir))
-                                               1)
-                                            dir)
+                            (let [dir (submodule-dir id)
                                   _ (info (str "Exercising " id " in " (-> dir
                                                                            .getCanonicalPath)))
                                   _ (info (pr-str command))
                                   {:keys [out exit err]} (time id
-                                                               (apply sh (into command
-                                                                               [:dir dir
-                                                                                :env env])))
+                                                           (apply sh (into command
+                                                                           [:dir dir
+                                                                            :env env])))
                                   ok? (zero? exit)]
                               (assert ok? (when-not ok?
                                             [id
@@ -183,6 +186,16 @@
     (throw (ex-info "." {})))
 
   (sh "lein" "install" :dir (System/getProperty "user.dir") :env env)
+
+  ;; Pedestal needs separate invocations for `install`, `deps`:
+  (let [{:keys [out exit err]} (apply sh (reduce into [["lein" "with-profile" "-user"
+                                                        "sub" "with-profile" "-user" "install"]
+                                                       [:dir (submodule-dir "pedestal")
+                                                        :env env]]))]
+    (when-not (zero? exit)
+      (println out)
+      (println err)
+      (assert false)))
 
   (-> sut/cache-filename File. .delete)
 
