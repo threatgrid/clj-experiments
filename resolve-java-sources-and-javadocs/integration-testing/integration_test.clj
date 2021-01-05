@@ -138,11 +138,17 @@
        (pmap (fn [chunks]
                (->> chunks
                     (mapv (fn [[id command]]
-                            (let [_ (info (str "Exercising " id))
+                            (let [dir (io/file "integration-testing" id)
+                                  _ (assert (-> dir .exists))
+                                  _ (assert (> (count (file-seq dir))
+                                               1)
+                                            dir)
+                                  _ (info (str "Exercising " id " in " (-> dir
+                                                                           .getCanonicalPath)))
                                   _ (info (pr-str command))
                                   {:keys [out exit err]} (time id
                                                                (apply sh (into command
-                                                                               [:dir (io/file "integration-testing" id)
+                                                                               [:dir dir
                                                                                 :env env])))
                                   ok? (zero? exit)]
                               (assert ok? (when-not ok?
