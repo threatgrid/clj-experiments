@@ -3,7 +3,7 @@ name: GitHub Actions Pull Request
 on:
   push:
     paths:
-      - "resolve-java-sources-and-javadocs"
+      - "resolve-java-sources-and-javadocs/**"
 
 env:
   LEIN_ROOT: true
@@ -22,10 +22,9 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-  test-matrix:
+  run-tests:
     runs-on: ubuntu-18.04
     needs: [setup]
-    working-directory: resolve-java-sources-and-javadocs
     steps:
       - run: echo "BIN_PATH=${HOME}/bin" >> $GITHUB_ENV
       - name: Setup PATH and folders
@@ -35,12 +34,10 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: recursive
-
       - uses: actions/setup-java@v1
         with:
           java-version: ${{ env.JAVA_VERSION }}
       - run: java -version
-
       - name: Install Leiningen
         run: |
           if ! command -v lein
@@ -51,10 +48,12 @@ jobs:
             lein version
           fi
       - name: run tests
+        working-directory: ./resolve-java-sources-and-javadocs
         run: no_eval_in_leiningen=1 lein test
         env:
           no_eval_in_leiningen: true
       - name: exercise the plugin over a variety of real-world projects
+        working-directory: ./resolve-java-sources-and-javadocs
         run: no_eval_in_leiningen=1 lein integration-test
         env:
           no_eval_in_leiningen: true
