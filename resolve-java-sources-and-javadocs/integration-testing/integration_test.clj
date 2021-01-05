@@ -15,15 +15,18 @@
              ;; for Lein logging:
              (assoc "DEBUG" "true")))
 
-(def lein (->> [(-> "user.home"
+(def lein (->> [(io/file "/usr" "local" "bin" "lein") ;; github actions
+                (-> "user.home" ;; personal setup
                     (System/getProperty)
                     (io/file "bin" "lein-latest"))
-                (-> "user.home"
+                (-> "user.home" ;; standard
                     (System/getProperty)
                     (io/file "bin" "lein"))]
                (filter (memfn ^File exists))
                first
                str))
+
+(assert (seq lein))
 
 (def project-version (-> "project.clj"
                          slurp
