@@ -143,8 +143,13 @@
                                   {:keys [out exit err]} (time id
                                                                (apply sh (into command
                                                                                [:dir (io/file "integration-testing" id)
-                                                                                :env env])))]
-                              (assert (zero? exit) [id (pr-str (-> err (doto println)))])
+                                                                                :env env])))
+                                  ok? (zero? exit)]
+                              (assert ok? (when-not ok?
+                                            [id
+                                             exit
+                                             (pr-str (-> out (doto println)))
+                                             (pr-str (-> err (doto println)))]))
                               (let [lines (->> out
                                                string/split-lines
                                                (filter (fn [s]
