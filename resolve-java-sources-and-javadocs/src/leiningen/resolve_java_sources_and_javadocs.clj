@@ -40,7 +40,7 @@
                raf)
             (finally
               (-> lock .release)))
-          (if (= retry 1001)
+          (if (= retry 1000)
             (throw (Exception. "Locked by other thread or process."))
             (do
               (Thread/sleep 5)
