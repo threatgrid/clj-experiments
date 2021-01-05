@@ -4,10 +4,10 @@ on:
   push:
     paths:
       - "resolve-java-sources-and-javadocs/**"
+      - ".github/**"
 
 env:
   LEIN_ROOT: true
-  LEIN_VERSION: 2.9.4
   JAVA_VERSION: 8
 
 jobs:
@@ -27,15 +27,10 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
       - run: java -version
-      - name: Install Leiningen
-        run: |
-          if ! command -v lein
-          then
-            cd "${BIN_PATH}"
-            curl -sLO https://raw.githubusercontent.com/technomancy/leiningen/${LEIN_VERSION}/bin/lein
-            chmod a+x lein
-            lein version
-          fi
+      - uses: DeLaGuardo/setup-clojure@91054c3
+        with:
+          cli: '1.10.1.469'
+          lein: 2.9.4
       - name: run tests
         working-directory: ./resolve-java-sources-and-javadocs
         run: no_eval_in_leiningen=1 lein test
