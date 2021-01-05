@@ -13,7 +13,8 @@
 (def env (-> (into {} (System/getenv))
              (dissoc "CLASSPATH")
              ;; for Lein logging:
-             (assoc "DEBUG" "true")))
+             (assoc "DEBUG" "true")
+             (assoc "LEIN_JVM_OPTS" "-Dclojure.main.report=stderr")))
 
 (def lein (->> [(io/file "/usr" "local" "bin" "lein") ;; github actions
                 (-> "user.home" ;; personal setup
