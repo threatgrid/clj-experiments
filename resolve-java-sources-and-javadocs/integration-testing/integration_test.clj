@@ -123,9 +123,8 @@
      ret#))
 
 (def parallelism-factor
-  (-> "leiningen.resolve-java-sources-and-javadocs.test.parallelism"
-      (System/getProperty "1")
-      read-string))
+  (Long/parseLong (or (System/getenv "integration_test_parallelism")
+                      "1")))
 
 (defn submodule-dir ^File [id]
   (let [dir (io/file "integration-testing" id)]
