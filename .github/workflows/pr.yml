@@ -11,11 +11,12 @@ env:
 
 jobs:
   run-tests:
-    runs-on: ubuntu-18.04
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: ["ubuntu-18.04", "macOS-latest"]
         java-version: ["8", "11"]
-        integration-test-parallelism: ["1"]
+        integration-test-parallelism: ["1", "4"]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -29,6 +30,8 @@ jobs:
         with:
           cli: '1.10.1.469'
           lein: 2.9.4
+      # should match with `#'integration-test/lein`:
+      - run: which lein
       - name: run tests
         working-directory: ./resolve-java-sources-and-javadocs
         run: lein test

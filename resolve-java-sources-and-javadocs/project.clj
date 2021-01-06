@@ -1,4 +1,4 @@
-(defproject threatgrid/resolve-java-sources-and-javadocs "0.1.17"
+(defproject threatgrid/resolve-java-sources-and-javadocs "1.0.0"
   :description "Makes available .jars with Java sources and javadocs for a given project."
 
   :url "https://github.com/threatgrid/clj-experiments"

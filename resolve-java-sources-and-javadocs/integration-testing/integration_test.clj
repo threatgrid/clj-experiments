@@ -5,6 +5,7 @@
    [clojure.java.shell :refer [sh]]
    [clojure.string :as string]
    [leiningen.resolve-java-sources-and-javadocs :as sut]
+   [leiningen.resolve-java-sources-and-javadocs.locks :as locks]
    [leiningen.resolve-java-sources-and-javadocs.collections :refer [divide-by]]
    [leiningen.resolve-java-sources-and-javadocs.logging :refer [info]])
   (:import
@@ -16,7 +17,11 @@
              (assoc "DEBUG" "true")
              (assoc "LEIN_JVM_OPTS" "-Dclojure.main.report=stderr")))
 
-(def lein (->> [(io/file "/usr" "local" "bin" "lein") ;; github actions
+(def lein (->> [ ;; DeLaGuardo/setup-clojure (linux)
+                (io/file "/opt" "hostedtoolcache" "Leiningen" "2.9.4" "x64" "bin" "lein")
+                ;; DeLaGuardo/setup-clojure (macOS)
+                (io/file "/Users" "runner" "hostedtoolcache" "Leiningen" "2.9.4" "x64" "bin" "lein")
+                (io/file "/usr" "local" "bin" "lein") ;; github actions (generic Lein setup)
                 (-> "user.home" ;; personal setup
                     (System/getProperty)
                     (io/file "bin" "lein-latest"))
@@ -76,7 +81,9 @@
     "riemann"       vanilla-lein-deps
     "welle"         vanilla-lein-deps
     ;; uses various plugins:
-    "schema"        vanilla-lein-deps
+    "schema"        (with-meta vanilla-lein-deps
+                      ;; something core.rrb-vector related
+                      {::skip-in-newer-jdks true})
     ;; uses lein-parent:
     "trapperkeeper" vanilla-lein-deps
     ;; uses lein-parent:
@@ -89,9 +96,11 @@
                                   (prelude "install,")
                                   ["deps"]])
     ;; uses lein-sub:
-    "icepick"       (reduce into [(prelude lein)
-                                  (prelude "sub")
-                                  ["deps"]])
+    "icepick"       (with-meta (reduce into [(prelude lein)
+                                             (prelude "sub")
+                                             ["deps"]])
+                      ;; Icepick seemingly relies on tools.jar, unavailable in JDK9+
+                      {::skip-in-newer-jdks true})
     ;; uses lein-sub:
     "crux"          (reduce into [(prelude lein)
                                   (prelude "sub")
@@ -101,13 +110,15 @@
                                   (prelude "sub")
                                   ["deps"]])
     ;; uses lein-monolith:
-    "sparkplug"     (reduce into [(prelude lein)
-                                  ["monolith"]
-                                  (prelude "each")
-                                  ["do"
-                                   "clean,"
-                                   "install,"
-                                   "deps"]])}))
+    "sparkplug"     (with-meta (reduce into [(prelude lein)
+                                             ["monolith"]
+                                             (prelude "each")
+                                             ["do"
+                                              "clean,"
+                                              "install,"
+                                              "deps"]])
+                      ;; something fipp-related (unrelated to our vendored version):
+                      {::skip-in-newer-jdks true})}))
 
 (defmacro time
   {:style/indent 1}
@@ -144,36 +155,39 @@
        (pmap (fn [chunks]
                (->> chunks
                     (mapv (fn [[id command]]
-                            (let [dir (submodule-dir id)
-                                  _ (info (str "Exercising " id " in " (-> dir
-                                                                           .getCanonicalPath)))
-                                  _ (info (pr-str command))
-                                  {:keys [out exit err]} (time id
-                                                           (apply sh (into command
-                                                                           [:dir dir
-                                                                            :env env])))
-                                  ok? (zero? exit)]
-                              (assert ok? (when-not ok?
-                                            [id
-                                             exit
-                                             (pr-str (-> out (doto println)))
-                                             (pr-str (-> err (doto println)))]))
-                              (let [lines (->> out
-                                               string/split-lines
-                                               (filter (fn [s]
-                                                         (string/includes? s "leiningen.resolve-java-sources-and-javadocs"))))
-                                    good (->> lines (filter (fn [s]
-                                                              (string/includes? s "/found"))))
-                                    bad (->> lines (filter (fn [s]
-                                                             (string/includes? s "/could-not")
-                                                             (string/includes? s "/timed-out")
-                                                             ;; #{"sources"} is specified in `#'prelude`
-                                                             (string/includes? s ":classifier \"javadoc\""))))]
-                                (assert (empty? bad)
-                                        (pr-str [id bad]))
-                                (f id good)
-                                (info "")
-                                id)))))))
+                            (if (and (not (-> "java.version" System/getProperty (string/starts-with? "1.8")))
+                                     (-> command meta ::skip-in-newer-jdks))
+                              id
+                              (let [dir (submodule-dir id)
+                                    _ (info (str "Exercising " id " in " (-> dir
+                                                                             .getCanonicalPath)))
+                                    _ (info (pr-str command))
+                                    {:keys [out exit err]} (time id
+                                                             (apply sh (into command
+                                                                             [:dir dir
+                                                                              :env env])))
+                                    ok? (zero? exit)]
+                                (assert ok? (when-not ok?
+                                              [id
+                                               exit
+                                               (pr-str (-> out (doto println)))
+                                               (pr-str (-> err (doto println)))]))
+                                (let [lines (->> out
+                                                 string/split-lines
+                                                 (filter (fn [s]
+                                                           (string/includes? s "leiningen.resolve-java-sources-and-javadocs"))))
+                                      good (->> lines (filter (fn [s]
+                                                                (string/includes? s "/found"))))
+                                      bad (->> lines (filter (fn [s]
+                                                               (string/includes? s "/could-not")
+                                                               (string/includes? s "/timed-out")
+                                                               ;; #{"sources"} is specified in `#'prelude`
+                                                               (string/includes? s ":classifier \"javadoc\""))))]
+                                  (assert (empty? bad)
+                                          (pr-str [id bad]))
+                                  (f id good)
+                                  (info "")
+                                  id))))))))
 
        (apply concat)
 
@@ -222,7 +236,7 @@
                          "The cache only accretes - other projects' cache building doesn't undo prior work"
                          (count good-lines)])))
 
-  (let [v (-> sut/cache-filename sut/read-file! sut/safe-read-string)]
+  (let [v (-> sut/cache-filename locks/read-file! sut/safe-read-string)]
     (assert (= v
                (-> v sut/deserialize sut/serialize))
             "Roundtrip")

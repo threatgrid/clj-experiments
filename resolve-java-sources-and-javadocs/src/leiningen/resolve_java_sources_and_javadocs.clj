@@ -4,6 +4,7 @@
    [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.walk :as walk]
+   [leiningen.resolve-java-sources-and-javadocs.locks :refer [read-file! write-file!]]
    [leiningen.resolve-java-sources-and-javadocs.collections :refer [add-exclusions-if-classified divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
    [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]]
    [threatgrid.fipp.clojure])
@@ -18,49 +19,6 @@
       System/getProperty
       (File. ".lein-source-and-javadocs-cache")
       (str)))
-
-(def in-process-lock
-  "Although Lein invocation concurrency is primarily inter-process, it can also be in-process: https://git.io/JLdS8
-
-  This lock guards against in-process concurrent acquisition of a FileLock,
-  which would otherwise throw a `java.nio.channels.OverlappingFileLockException`."
-  (Object.))
-
-(defn locking-file
-  "These file locks guard against concurrent Lein executions, which could otherwise corrupt a given file."
-  [^String filename f]
-  (locking in-process-lock
-    (with-open [raf (-> filename io/file (RandomAccessFile. "rws"))
-                channel (-> raf .getChannel)]
-      (loop [retry 0]
-        (if-let [^FileLock lock (-> channel .tryLock)]
-          (try
-            (assert (not (-> lock .isShared)))
-            (f (slurp filename)
-               raf)
-            (finally
-              (-> lock .release)))
-          (if (= retry 1000)
-            (throw (Exception. "Locked by other thread or process."))
-            (do
-              (Thread/sleep 5)
-              (recur (inc retry)))))))))
-
-(defn read-file! [filename]
-  (locking-file filename (fn [s _]
-                           s)))
-
-(defn write-file! [filename merge-fn]
-  (locking-file filename (fn [^String s, ^RandomAccessFile raf]
-                           (let [^String v (merge-fn s)]
-                             (when-not (= s v)
-                               (assert (> (-> v .length)
-                                          (-> s .length))
-                                       "Cache file sizes should only grow")
-                               (-> raf (.setLength 0))
-                               (-> raf (.writeBytes v))
-                               (-> raf .getChannel (.force true)))
-                             v))))
 
 (defn serialize
   "Turns any contained coll into a vector, sorting it.

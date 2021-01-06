@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [are deftest is testing]]
+   [leiningen.resolve-java-sources-and-javadocs.locks :as locks]
    [leiningen.resolve-java-sources-and-javadocs :as sut])
   (:import
    (java.io File)))
@@ -10,7 +11,7 @@
   (testing "Reads file contents"
     (are [input expected] (testing input
                             (is (= expected
-                                   (-> input io/resource io/as-file str sut/read-file!)))
+                                   (-> input io/resource io/as-file str locks/read-file!)))
                             true)
       "integration/leiningen/foo.txt" "42\n")))
 
@@ -22,11 +23,11 @@
       (-> file .createNewFile)
       (try
         (are [input expected] (testing input
-                                (let [v (sut/write-file! filename
+                                (let [v (locks/write-file! filename
                                                          (sut/make-merge-fn state))]
 
                                   (is (= expected v))
-                                  (is (= expected (sut/read-file! filename))))
+                                  (is (= expected (locks/read-file! filename))))
                                 true)
           (swap! state assoc [[4]] {[5 6] nil}) "[[[[4]] [[[5 6] nil]]]]\n"
           (swap! state assoc [[1]] {[2 3] nil}) "[[[[1]] [[[2 3] nil]]] [[[4]] [[[5 6] nil]]]]\n")

@@ -30,7 +30,7 @@ Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide 
 ;; Installing this plugin under the :repl profile is most recommended for best performance,
 ;; especially if you work with a monorepo with a complex build process.  
 :repl {:middleware [leiningen.resolve-java-sources-and-javadocs/add]
-       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "0.1.17"]]
+       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "1.0.0"]]
        ;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
        :resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}}
 
