@@ -4,9 +4,9 @@
    [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.walk :as walk]
-   [fipp.clojure]
    [leiningen.resolve-java-sources-and-javadocs.collections :refer [add-exclusions-if-classified divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
-   [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]])
+   [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]]
+   [threatgrid.fipp.clojure])
   (:import
    (java.io File RandomAccessFile)
    (java.net InetAddress UnknownHostException URI)
@@ -116,7 +116,7 @@
 
 (defn ppr-str [x]
   (with-out-str
-    (fipp.clojure/pprint x)))
+    (threatgrid.fipp.clojure/pprint x)))
 
 (defn make-merge-fn [cache-atom]
   {:pre [@cache-atom]}
