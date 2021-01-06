@@ -7,18 +7,17 @@
    (java.nio.file Paths StandardOpenOption)))
 
 (defn nonclosing-slurp
-  "Like `#'slurp, but does not close `f`, so that the underlying channel isn't closed either."
-  [f & opts]
-  (let [opts (#'clojure.core/normalize-slurp-opts opts)
-        sw (StringWriter.)
-        ^Reader r (apply io/reader f opts)]
+  "Like `#'slurp`, but does not close `f`, so that the underlying channel isn't closed either."
+  [f]
+  (let [sw (StringWriter.)
+        ^Reader r (io/reader f)]
     (io/copy r sw)
     (-> sw .toString)))
 
 (defn nonclosing-spit
-  "Like `#'spit, but does not close `f`, so that the underlying channel isn't closed either."
-  [f content & options]
-  (let [^Writer w (apply io/writer f options)]
+  "Like `#'spit`, but does not close `f`, so that the underlying channel isn't closed either."
+  [f content]
+  (let [^Writer w (io/writer f)]
     (-> w (.write (str content)))
     (-> w .flush)))
 
@@ -35,7 +34,9 @@
 (defn write! [^FileChannel ch, ^String s]
   (-> ch (Channels/newWriter "UTF-8") (nonclosing-spit s)))
 
-(defn locking-file [^String filename f]
+(defn locking-file
+  "These file locks guard against concurrent Lein executions, which could otherwise corrupt a given file."
+  [^String filename f]
   (locking in-process-lock
     (with-open [c (FileChannel/open (Paths/get filename (into-array String []))
                                     (into-array StandardOpenOption [StandardOpenOption/CREATE

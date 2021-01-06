@@ -24,7 +24,7 @@
       (try
         (are [input expected] (testing input
                                 (let [v (locks/write-file! filename
-                                                         (sut/make-merge-fn state))]
+                                                           (sut/make-merge-fn state))]
 
                                   (is (= expected v))
                                   (is (= expected (locks/read-file! filename))))
@@ -47,6 +47,19 @@
            (-> serialized sut/deserialize)))))
 
 (deftest acceptable-repository?
+  (are [desc input expected] (testing [desc input]
+                               (is (= expected
+                                      (sut/acceptable-repository? [:_ input])))
+                               true)
+    "Basic case"
+    {:url "https://example.com"}
+    true
+
+    "Rejects entries having passwords, as they generally won't have source .jar (affecting performance)"
+    {:url      "https://example.com"
+     :password "foo"}
+    false)
+
   (are [desc input expected] (testing [desc input]
                                (is (= expected
                                       (sut/acceptable-repository? [:_ {:url input}])))
