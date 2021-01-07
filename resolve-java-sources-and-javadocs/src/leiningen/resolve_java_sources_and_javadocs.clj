@@ -1,17 +1,16 @@
 (ns leiningen.resolve-java-sources-and-javadocs
+  (:refer-clojure :exclude [time])
   (:require
    [cemerick.pomegranate.aether]
-   [clojure.java.io :as io]
    [clojure.string :as string]
    [clojure.walk :as walk]
-   [leiningen.resolve-java-sources-and-javadocs.locks :refer [read-file! write-file!]]
    [leiningen.resolve-java-sources-and-javadocs.collections :refer [add-exclusions-if-classified divide-by ensure-no-lists flatten-deps maybe-normalize safe-sort]]
-   [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info]]
+   [leiningen.resolve-java-sources-and-javadocs.locks :refer [read-file! write-file!]]
+   [leiningen.resolve-java-sources-and-javadocs.logging :refer [debug info warn]]
    [threatgrid.fipp.clojure])
   (:import
-   (java.io File RandomAccessFile)
+   (java.io File)
    (java.net InetAddress UnknownHostException URI)
-   (java.nio.channels FileLock)
    (java.util.concurrent ExecutionException)))
 
 (def ^String cache-filename
@@ -292,6 +291,49 @@
                 ;; order can be sensitive
                 (into additions deps))))))
 
+(defmacro time
+  {:style/indent 1}
+  [atom-obj expr]
+  `(let [start# (. System (nanoTime))
+         ret# ~expr]
+     (reset! ~atom-obj (format "Completed in %.2f minutes." (-> System
+                                                                (. (nanoTime))
+                                                                (- start#)
+                                                                (double)
+                                                                (/ 1000000.0)
+                                                                (/ 60000.0))))
+     ret#))
+
+(defn wrap-failsafe
+  "Wraps `f` in a 'failsafe' way, protecting it against exceptions and overly slow executions."
+  [f timeout]
+  {:pre [(ifn? f)
+         (pos-int? timeout)]}
+  (fn [project]
+    (try
+      (let [v (deref (future
+                       (f project))
+                     (* 1000 timeout)
+                     ::timed-out)]
+        (if-not (= v ::timed-out)
+          v
+          (do
+            (warn (str ::timed-out))
+            project)))
+      (catch ExecutionException e
+        (-> e .getCause .printStackTrace)
+        project))))
+
 (defn resolve-java-sources-and-javadocs
-  [project & args]
-  (add project))
+  [{{:keys [failsafe timeout]
+     :or   {failsafe true
+            timeout  100}} :resolve-java-sources-and-javadocs
+    :as                    project}
+   & args]
+  (let [a (atom nil)
+        f (cond-> add
+            failsafe (wrap-failsafe timeout))
+        v (time a
+            (f project))]
+    (debug @a)
+    v))

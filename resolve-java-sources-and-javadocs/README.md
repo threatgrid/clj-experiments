@@ -2,7 +2,7 @@
 
 A Leiningen plugin that automatically downloads all available `.jar`s with Java sources and javadocs for a given project, so that various tooling (typically IDEs) can access it.
 
-It behaves gracefully even in face of `:managed-dependencies`, `:pedantic?`,  in- and inter-process parallel invocations of Lein, etc.
+It behaves gracefully even in face of `:managed-dependencies`, `:pedantic?`, in- and inter-process parallel invocations of Lein, etc.
 
 For efficiency, it has caching that is shared across projects, and dependency resolution is parallel.
 
@@ -30,7 +30,7 @@ Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide 
 ;; Installing this plugin under the :repl profile is most recommended for best performance,
 ;; especially if you work with a monorepo with a complex build process.  
 :repl {:middleware [leiningen.resolve-java-sources-and-javadocs/add]
-       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "1.0.1"]]
+       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "1.1.0"]]
        ;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
        :resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}}
 
