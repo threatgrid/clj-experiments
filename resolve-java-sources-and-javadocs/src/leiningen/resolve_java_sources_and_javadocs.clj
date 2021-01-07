@@ -185,7 +185,7 @@
                             (filter (fn [x]
                                       (->> (memoized-resolve! [x])
                                            flatten-deps
-                                           (filter #{x})
+                                           (filter #{(maybe-add-exclusions x)})
                                            first
                                            some?))))))
              (distinct)
