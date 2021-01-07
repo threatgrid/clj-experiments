@@ -308,7 +308,8 @@
   "Wraps `f` in a 'failsafe' way, protecting it against exceptions and overly slow executions."
   [f timeout]
   {:pre [(ifn? f)
-         (pos-int? timeout)]}
+         (pos? timeout)
+         (integer? timeout)]}
   (fn [project]
     (try
       (let [v (deref (future

@@ -18,8 +18,10 @@
              (assoc "LEIN_JVM_OPTS" "-Dclojure.main.report=stderr")))
 
 (def lein (->> [ ;; DeLaGuardo/setup-clojure (linux)
+                (io/file "/opt" "hostedtoolcache" "Leiningen" "2.8.1" "x64" "bin" "lein")
                 (io/file "/opt" "hostedtoolcache" "Leiningen" "2.9.4" "x64" "bin" "lein")
                 ;; DeLaGuardo/setup-clojure (macOS)
+                (io/file "/Users" "runner" "hostedtoolcache" "Leiningen" "2.8.1" "x64" "bin" "lein")
                 (io/file "/Users" "runner" "hostedtoolcache" "Leiningen" "2.9.4" "x64" "bin" "lein")
                 (io/file "/usr" "local" "bin" "lein") ;; github actions (generic Lein setup)
                 (-> "user.home" ;; personal setup
