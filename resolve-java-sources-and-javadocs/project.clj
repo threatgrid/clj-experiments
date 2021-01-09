@@ -15,6 +15,8 @@
   :profiles {:dev                 {:dependencies [[clj-commons/pomegranate "1.2.0"]
                                                   [org.clojure/clojure "1.10.1"]]}
 
-             :integration-testing {:source-paths ["integration-testing"]}}
+             :integration-testing {:source-paths ["integration-testing"]}
+
+             :self-test           {:middleware [leiningen.resolve-java-sources-and-javadocs/add]}}
 
   :aliases {"integration-test" ["with-profile" "+integration-testing" "run" "-m" "integration-test"]})

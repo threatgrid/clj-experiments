@@ -195,6 +195,26 @@
 
        doall))
 
+(defn classpath-test! []
+  (letfn [(run [extra-profile]
+            {:post [(-> % count pos?)]}
+            (let [{:keys [out err exit]} (apply sh (reduce into [["lein"
+                                                                  "with-profile"
+                                                                  (str "-user" extra-profile)
+                                                                  "classpath"]
+                                                                 [:env env]]))]
+              (when-not (zero? exit)
+                (println out)
+                (println err)
+                (assert false))
+              (string/split out #":")))]
+    (let [[count-with count-without] (->> [",+self-test"
+                                           ""]
+                                          (map run)
+                                          (map count))]
+      (assert (> count-with count-without)
+              (pr-str [count-with count-without])))))
+
 (defn suite []
 
   (when-not *assert*
@@ -244,7 +264,9 @@
             "Roundtrip")
     (assert (= v
                (-> v sut/deserialize sut/serialize sut/deserialize sut/serialize))
-            "Longer roundtrip")))
+            "Longer roundtrip"))
+
+  (classpath-test!))
 
 (defn -main [& _]
 
