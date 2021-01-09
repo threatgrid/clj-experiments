@@ -30,7 +30,7 @@ Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide 
 ;; Installing this plugin under the :repl profile is most recommended for best performance,
 ;; especially if you work with a monorepo with a complex build process.  
 :repl {:middleware [leiningen.resolve-java-sources-and-javadocs/add]
-       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "1.1.1"]]
+       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "1.2.0"]]
        ;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
        :resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}}
 
@@ -58,6 +58,10 @@ The `~/.lein-source-and-javadocs-cache` file has a stable format. You can versio
 
 ## Options
 
+This plugin observes a number of Lein configuration options under the `:resolve-java-sources-and-javadocs` key:
+
+#### `:classifiers`
+
 By default, both sources and javadocs will be fetched. By specifying only `sources` to be fetched, one gets a 2x performance improvement (because 0.5x as many items will be attempted to be resolved):
 
 ```clj
@@ -65,6 +69,46 @@ By default, both sources and javadocs will be fetched. By specifying only `sourc
 ```
 
 You can also specify classifiers other than `"sources", "javadoc"`, if that is useful to you.
+
+#### `:failsafe`
+
+By default, this plugin runs within a try/catch block and within a timeout. This wrapping is called the 'failsafe'
+and it has the goal of preventing the plugin from possibly disrupting REPL/IDE startup.
+
+If an error or timeout occurs, REPL startup will continue, although no entries will be added to the classpath.
+
+Generally you want to keep this default. By specifying `:failsafe false`, you can disable this wrapping, which might ease troubleshooting.
+
+#### `:timeout`
+
+This is the timeout value in seconds that `:failsafe` uses. It defaults to 100.
+
+#### `:repositories`
+
+The Maven repositories that this plugin will query, in search of sources and javadocs.
+
+Defaults to your project's Lein :repositories, typically Maven Central + Clojars + any custom repositories you may have specified.
+
+If you specify `:repositories`, they will replace Lein's entirely. 
+
+In all cases, repositories detected as unreachable (because of DNS, auth, etc) will be removed.
+
+## Troubleshooting
+
+If the plugin is not behaving as it should, you can debug it in isolation with the following command:
+
+```
+DEBUG=true lein with-profile +repl deps
+```
+
+The following entries can be possibly logged:
+
+* `:leiningen.resolve-java-sources-and-javadocs/resolving` - a request is being performed for resolving a specific dependency (of any kind: plain, source or javadoc)
+* `:leiningen.resolve-java-sources-and-javadocs/found` - a source/jar artifact has been found, and will be added to the classpath.
+* `:leiningen.resolve-java-sources-and-javadocs/resolved` - a request has succeeded in resolving a specific dependency (of any kind: plain, source or javadoc) 
+* `:leiningen.resolve-java-sources-and-javadocs/timed-out` - a given dependency request has timed out, or the plugin as a whole has timed out (per the `:failsafe` option).
+
+If you wish to start from a clean slate (given that resolutions are cached, even in face of timeout), you can remove the `~/.lein-source-and-javadocs-cache` cache file. 
 
 ## [Note if using refactor-nrepl, CIDER, Orchard](https://github.com/clojure-emacs/refactor-nrepl/issues/290) 
 

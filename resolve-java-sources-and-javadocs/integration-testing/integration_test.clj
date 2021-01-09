@@ -198,32 +198,33 @@
 (defn classpath-test! []
   (letfn [(run [extra-profile]
             {:post [(-> % count pos?)]}
-            (let [{:keys [out err exit]} (apply sh (reduce into [["lein"
+            (let [{:keys [out err exit]} (apply sh (reduce into [[lein
                                                                   "with-profile"
-                                                                  (str "-user" extra-profile)
+                                                                  (str "-user,-dev" extra-profile)
                                                                   "classpath"]
-                                                                 [:env env]]))]
+                                                                 [:env env
+                                                                  :dir (System/getProperty "user.dir")]]))]
               (when-not (zero? exit)
                 (println out)
                 (println err)
                 (assert false))
               (string/split out #":")))]
-    (let [[count-with count-without] (->> [",+self-test"
-                                           ""]
-                                          (map run)
-                                          (map count))]
+    (let [runs (->> [",+self-test"
+                     ""]
+                    (map run))
+          [count-with count-without] (->> runs (map count))]
       (assert (> count-with count-without)
-              (pr-str [count-with count-without])))))
+              (pr-str [count-with count-without runs])))))
 
 (defn suite []
 
   (when-not *assert*
     (throw (ex-info "." {})))
 
-  (sh "lein" "install" :dir (System/getProperty "user.dir") :env env)
+  (sh lein "install" :dir (System/getProperty "user.dir") :env env)
 
   ;; Pedestal needs separate invocations for `install`, `deps`:
-  (let [{:keys [out exit err]} (apply sh (reduce into [["lein" "with-profile" "-user"
+  (let [{:keys [out exit err]} (apply sh (reduce into [[lein "with-profile" "-user"
                                                         "sub" "with-profile" "-user" "install"]
                                                        [:dir (submodule-dir "pedestal")
                                                         :env env]]))]

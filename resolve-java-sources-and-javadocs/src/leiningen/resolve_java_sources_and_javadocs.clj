@@ -246,10 +246,11 @@
          (catch UnknownHostException _
            false))))
 
-(defn add [{:keys                                        [repositories managed-dependencies]
-            {:keys [classifiers]
-             :or   {classifiers #{"javadoc" "sources"}}} :resolve-java-sources-and-javadocs
-            :as                                          project}]
+(defn add [{:keys                                                      [repositories managed-dependencies]
+            {:keys               [classifiers]
+             plugin-repositories :repositories
+             :or                 {classifiers #{"javadoc" "sources"}}} :resolve-java-sources-and-javadocs
+            :as                                                        project}]
 
   (debug (str [::classifiers classifiers]))
 
@@ -257,6 +258,8 @@
                                 (or (not-empty s) "[]")))
 
   (let [classifiers (set classifiers)
+        repositories (or (not-empty plugin-repositories)
+                         repositories)
         repositories (into {}
                            (filter acceptable-repository?)
                            repositories)

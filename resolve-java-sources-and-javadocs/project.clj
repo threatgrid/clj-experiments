@@ -1,4 +1,4 @@
-(defproject threatgrid/resolve-java-sources-and-javadocs "1.1.1"
+(defproject threatgrid/resolve-java-sources-and-javadocs "1.2.0"
   :description "Makes available .jars with Java sources and javadocs for a given project."
 
   :url "https://github.com/threatgrid/clj-experiments"
@@ -11,12 +11,14 @@
 
   :eval-in-leiningen ~(nil? (System/getenv "no_eval_in_leiningen"))
 
-  ;; Eases developing the plugin when (false? eval-in-leiningen):
-  :profiles {:dev                 {:dependencies [[clj-commons/pomegranate "1.2.0"]
+  :profiles {;; These developing the plugin when (false? eval-in-leiningen):
+             :dev                 {:dependencies [[clj-commons/pomegranate "1.2.0"]
                                                   [org.clojure/clojure "1.10.1"]]}
 
              :integration-testing {:source-paths ["integration-testing"]}
 
-             :self-test           {:middleware [leiningen.resolve-java-sources-and-javadocs/add]}}
+             :self-test           {:middleware   [leiningen.resolve-java-sources-and-javadocs/add]
+                                   ;; ensure that at least one dependency will fetch sources:
+                                   :dependencies [[puppetlabs/trapperkeeper-webserver-jetty9 "4.1.0"]]}}
 
   :aliases {"integration-test" ["with-profile" "+integration-testing" "run" "-m" "integration-test"]})

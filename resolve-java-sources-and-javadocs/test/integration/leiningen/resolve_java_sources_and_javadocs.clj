@@ -296,3 +296,37 @@ since a git repo inherently cannot resolve to a .jar artifact"
                                                                [org.tukaani/xz "1.8" :classifier "sources"]
                                                                [org.yaml/snakeyaml "1.24" :classifier "sources"]
                                                                [puppetlabs/ssl-utils "3.0.4" :classifier "sources"]]))))
+
+(deftest wrap-failsafe
+  (let [project {::project ::project}]
+
+    (are [input expected] (testing input
+                            (is (= expected
+                                   (let [silently--old System/out
+                                         silently--pw (java.io.PrintWriter. "/dev/null")
+                                         silently--ps (java.io.PrintStream. (proxy [java.io.OutputStream] []
+                                                                              (write
+                                                                                ([a])
+                                                                                ([a b c])
+                                                                                ([a b c d e]))))]
+                                     (binding [*out* silently--pw
+                                               *err* silently--pw]
+                                       (try
+                                         (System/setOut silently--ps)
+                                         (System/setErr silently--ps)
+                                         ((sut/wrap-failsafe input 1) project)
+                                         (finally
+                                           (System/setOut silently--old)
+                                           (System/setErr silently--old)))))))
+                            true)
+      (fn [project]
+        (assoc project ::foo 42)) (assoc project ::foo 42)
+
+      (fn [project]
+        (Thread/sleep 1500))      project
+
+      (fn [project]
+        (assert false))           project
+
+      (fn [project]
+        (throw (ex-info "." {}))) project)))
