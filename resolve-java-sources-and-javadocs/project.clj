@@ -1,4 +1,4 @@
-(defproject threatgrid/resolve-java-sources-and-javadocs "1.2.0"
+(defproject threatgrid/resolve-java-sources-and-javadocs "1.3.0"
   :description "Makes available .jars with Java sources and javadocs for a given project."
 
   :url "https://github.com/threatgrid/clj-experiments"
@@ -17,7 +17,7 @@
 
              :integration-testing {:source-paths ["integration-testing"]}
 
-             :self-test           {:middleware   [leiningen.resolve-java-sources-and-javadocs/add]
+             :self-test           {:middleware   [leiningen.resolve-java-sources-and-javadocs/middleware]
                                    ;; ensure that at least one dependency will fetch sources:
                                    :dependencies [[puppetlabs/trapperkeeper-webserver-jetty9 "4.1.0"]]}}
 

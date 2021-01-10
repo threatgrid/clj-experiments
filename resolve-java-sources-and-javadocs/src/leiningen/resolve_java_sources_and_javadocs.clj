@@ -328,10 +328,10 @@
         (-> e .getCause .printStackTrace)
         project))))
 
-(defn resolve-java-sources-and-javadocs
+(defn middleware
   [{{:keys [failsafe timeout]
      :or   {failsafe true
-            timeout  100}} :resolve-java-sources-and-javadocs
+            timeout  215}} :resolve-java-sources-and-javadocs
     :as                    project}
    & args]
   (let [a (atom nil)

@@ -29,8 +29,8 @@ Add the following somewhere in your `~/.lein/profiles.clj` (aka your [user-wide 
 ```clj
 ;; Installing this plugin under the :repl profile is most recommended for best performance,
 ;; especially if you work with a monorepo with a complex build process.  
-:repl {:middleware [leiningen.resolve-java-sources-and-javadocs/add]
-       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "1.2.0"]]
+:repl {:middleware [leiningen.resolve-java-sources-and-javadocs/middleware]
+       :plugins    [[threatgrid/resolve-java-sources-and-javadocs "1.3.0"]]
        ;; Optional - you can use this option to specify a different set (e.g. a smaller set like #{"sources"} is more performant)
        :resolve-java-sources-and-javadocs {:classifiers #{"sources" "javadoc"}}}
 
@@ -42,7 +42,7 @@ After that, `lein repl` and similar commands will download each artifact of your
 
 ## Notes on caching
 
-Running this middleware _for the first time_ on a given project will be slow (think: anything between 1-5m). The more dependencies your project has, especially Java ones, the slower this run will be.
+Running this middleware _for the first time_ on a given project will be slow (think: anything between 1-3m). The more dependencies your project has, especially Java ones, the slower this run will be.
 
 Each time a source or javadoc `.jar` is found, the found artifact will be logged, so that you can see that the plugin is in fact doing something:
 
@@ -81,7 +81,7 @@ Generally you want to keep this default. By specifying `:failsafe false`, you ca
 
 #### `:timeout`
 
-This is the timeout value in seconds that `:failsafe` uses. It defaults to 100.
+This is the timeout value in seconds that `:failsafe` uses. It defaults to 215.
 
 #### `:repositories`
 

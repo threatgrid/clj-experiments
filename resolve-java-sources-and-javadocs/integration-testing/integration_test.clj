@@ -58,7 +58,7 @@
            "--"
 
            "update-in"
-           ":middleware" "conj" "leiningen.resolve-java-sources-and-javadocs/add"
+           ":middleware" "conj" "leiningen.resolve-java-sources-and-javadocs/middleware"
            "--"]))
 
 (def vanilla-lein-deps
@@ -184,11 +184,15 @@
                                                                (string/includes? s "/could-not")
                                                                (string/includes? s "/timed-out")
                                                                ;; #{"sources"} is specified in `#'prelude`
-                                                               (string/includes? s ":classifier \"javadoc\""))))]
+                                                               (string/includes? s ":classifier \"javadoc\""))))
+                                      timing (->> out
+                                                  string/split-lines
+                                                  (filter (partial re-find #"Completed in.*minutes\.")))]
                                   (assert (empty? bad)
                                           (pr-str [id bad]))
+                                  (assert (-> timing count pos?))
                                   (f id good)
-                                  (info "")
+                                  (info (str id " - " (first timing)))
                                   id))))))))
 
        (apply concat)
